@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#12101d">
+<title>AgentLab · 从零手写 AI Agent</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🤖 AgentLab <span class="brand-sub">从零手写的 AI Agent 运行时</span></div>
+    <a class="gh-link" href="https://github.com/Mai1aKi/agentlab" target="_blank" rel="noreferrer">GitHub 仓库</a>
+  </header>
+
+  <section class="settings">
+    <label class="setting-row">
+      <span>模型</span>
+      <select id="model-kind">
+        <option value="mock">内置演示模型（规则驱动，零成本）</option>
+        <option value="byok">自定义 API（BYOK，OpenAI 兼容）</option>
+      </select>
+    </label>
+    <div id="byok-fields" class="byok" hidden>
+      <input id="base-url" type="text" value="https://api.openai.com/v1" aria-label="API 基础地址">
+      <input id="model-name" type="text" placeholder="模型名，如 gpt-4o-mini" aria-label="模型名">
+      <input id="api-key" type="password" placeholder="API Key（只存在你浏览器本地）" aria-label="API Key">
+    </div>
+    <p class="hint">Agent 的循环、工具调用、轨迹记录全部由本仓库手写实现；模型只负责「下一步做什么」。</p>
+  </section>
+
+  <main class="layout">
+    <section class="chat-panel">
+      <div id="samples" class="samples"></div>
+      <div id="chat" class="chat"></div>
+      <div class="composer">
+        <input id="task-input" type="text" placeholder="给 Agent 一个任务，例如：计算 (18 + 26) * 3">
+        <button id="run-btn" type="button" class="primary">运行</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <aside class="trace-panel">
+      <h2>运行轨迹</h2>
+      <div id="trace" class="trace"></div>
+    </aside>
+  </main>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

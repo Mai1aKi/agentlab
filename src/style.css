@@ -1,0 +1,160 @@
+:root {
+  --bg: #12101d;
+  --panel: #1b1830;
+  --panel-2: #241f42;
+  --line: #352e5c;
+  --ink: #ece9f7;
+  --ink-dim: #a79fd0;
+  --accent: #a78bfa;
+  --accent-2: #4ade80;
+  --danger: #f87171;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.brand { font-size: 1.25rem; font-weight: 700; }
+.brand-sub { font-size: 0.85rem; font-weight: 400; color: var(--ink-dim); margin-left: 8px; }
+.gh-link { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+.gh-link:hover { text-decoration: underline; }
+
+.settings {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 14px 22px 0;
+}
+.setting-row { display: flex; align-items: center; gap: 12px; font-size: 0.92rem; color: var(--ink-dim); }
+select, input[type="text"], input[type="password"] {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+.byok { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.byok input { flex: 1 1 200px; }
+.hint { color: var(--ink-dim); font-size: 0.82rem; margin: 8px 0 0; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px 22px 32px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.samples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+.bubble {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.94rem;
+}
+.bubble.user { align-self: flex-end; background: var(--accent); color: #17122e; font-weight: 600; }
+.bubble.assistant { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--line); }
+
+.composer { display: flex; gap: 10px; margin-top: 12px; }
+.composer input { flex: 1; padding: 11px 14px; }
+button { font: inherit; cursor: pointer; }
+button.primary {
+  background: var(--accent-2);
+  color: #0b1512;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+}
+button.primary:disabled { opacity: 0.55; cursor: wait; }
+.status { margin-top: 10px; color: var(--ink-dim); font-size: 0.86rem; font-family: var(--mono); }
+
+.trace-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+.trace-panel h2 { margin: 0 0 12px; font-size: 0.95rem; color: var(--ink-dim); letter-spacing: 0.04em; }
+.trace { display: flex; flex-direction: column; gap: 10px; }
+.trace-item {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.trace-item pre {
+  margin: 6px 0 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-dim);
+}
+.trace-item code { font-family: var(--mono); color: var(--accent); }
+.t-tag {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+  background: var(--line);
+  color: var(--ink);
+}
+.t-tag.model { background: #4c3a9e; }
+.t-tag.tool { background: #14532d; }
+.t-tag.final { background: var(--accent-2); color: #0b1512; }
+.t-tag.error { background: var(--danger); color: #2b0d0d; }
+
+.byok[hidden] { display: none; }
