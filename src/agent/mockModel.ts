@@ -13,26 +13,26 @@ export class MockModel implements ChatModel {
     const lastUserIdx = findLastIndex(messages, (m) => m.role === 'user');
     const userText = lastUserIdx >= 0 ? messages[lastUserIdx].content : '';
 
-    // If a tool already answered this user turn, compose the final reply.
-    const pending = pendingToolExchange(messages, lastUserIdx);
-    if (pending) {
-      return { type: 'text', content: composeFinal(pending.callName, pending.args, pending.result) };
+    // If tool(s) already answered this user turn, compose the final reply.
+    const pending = pendingToolExchanges(messages, lastUserIdx);
+    if (pending.length > 0) {
+      const parts = pending.map((p) => composeFinal(p.callName, p.args, p.result));
+      return { type: 'text', content: parts.join('\n') };
     }
 
-    const callId = `call_${messages.filter((m) => m.toolCall).length + 1}`;
+    // Collect every tool this turn needs — Day 1: one turn, several calls.
+    let nextId = messages.filter((m) => m.toolCall).length + 1;
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
 
     // 1) Arithmetic? Extract and delegate to the calculator tool.
     const expr = extractExpression(userText);
     if (expr) {
-      return {
-        type: 'toolCall',
-        call: { id: callId, name: 'calculator', args: { expression: expr } },
-      };
+      calls.push({ name: 'calculator', args: { expression: expr } });
     }
 
     // 2) Asking for the time?
     if (/几点|时间|日期|星期/.test(userText)) {
-      return { type: 'toolCall', call: { id: callId, name: 'clock', args: {} } };
+      calls.push({ name: 'clock', args: {} });
     }
 
     // 3) Asking a knowledge question?
@@ -41,9 +41,19 @@ export class MockModel implements ChatModel {
         .replace(/什么是|查一下|搜索|查一查|介绍一下|讲讲|解释|请问|帮我|一下/g, '')
         .replace(/[？?：:，,。\s]+/g, ' ')
         .trim();
+      calls.push({ name: 'kb_search', args: { query: query || userText } });
+    }
+
+    if (calls.length === 1) {
       return {
         type: 'toolCall',
-        call: { id: callId, name: 'kb_search', args: { query: query || userText } },
+        call: { id: `call_${nextId}`, name: calls[0].name, args: calls[0].args },
+      };
+    }
+    if (calls.length > 1) {
+      return {
+        type: 'toolCalls',
+        calls: calls.map((c) => ({ id: `call_${nextId++}`, name: c.name, args: c.args })),
       };
     }
 
@@ -55,6 +65,7 @@ export class MockModel implements ChatModel {
         '· 给我一道算式，我会调用 calculator 计算，例如「计算 (18 + 26) * 3」\n' +
         '· 问我「现在几点」，我会调用 clock\n' +
         '· 问我「什么是 RAG」，我会调用 kb_search 检索知识库\n' +
+        '· 一句话里问两件事，例如「计算 3 + 4，现在几点」，我会在同一轮同时调用多个工具\n' +
         '想接真模型的话，在上方把模型切换成「自定义 API（BYOK）」。',
     };
   }
@@ -71,23 +82,21 @@ interface PendingExchange {
   result: string;
 }
 
-/** After the last user message, is there an assistant tool call followed
- *  by its tool result? Then the model owes a final answer. */
-function pendingToolExchange(messages: Message[], lastUserIdx: number): PendingExchange | null {
-  let callMsg: Message | undefined;
-  let resultMsg: Message | undefined;
+/** After the last user message, collect every assistant tool call that
+ *  already has its tool result, paired in request order. Non-empty means
+ *  the model owes a final answer covering all of them. */
+function pendingToolExchanges(messages: Message[], lastUserIdx: number): PendingExchange[] {
+  const calls: { name: string; args: Record<string, unknown>; id: string }[] = [];
+  const results = new Map<string, string>();
   for (let i = lastUserIdx + 1; i < messages.length; i++) {
-    if (messages[i].toolCall) callMsg = messages[i];
-    if (messages[i].role === 'tool') resultMsg = messages[i];
+    const msg = messages[i];
+    const batch = msg.toolCalls ?? (msg.toolCall ? [msg.toolCall] : []);
+    for (const c of batch) calls.push({ name: c.name, args: c.args, id: c.id });
+    if (msg.role === 'tool' && msg.toolCallId) results.set(msg.toolCallId, msg.content);
   }
-  if (callMsg?.toolCall && resultMsg) {
-    return {
-      callName: callMsg.toolCall.name,
-      args: callMsg.toolCall.args,
-      result: resultMsg.content,
-    };
-  }
-  return null;
+  return calls
+    .filter((c) => results.has(c.id))
+    .map((c) => ({ callName: c.name, args: c.args, result: results.get(c.id) as string }));
 }
 
 function composeFinal(callName: string, args: Record<string, unknown>, result: string): string {

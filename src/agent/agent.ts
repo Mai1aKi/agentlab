@@ -1,8 +1,8 @@
 // The agent runtime: a ReAct-style loop around a pluggable model.
 //
 //   user message
-//     → model decides: final text, or one tool call
-//     → runtime executes the tool, feeds the result back
+//     → model decides: final text, or one/more tool calls
+//     → runtime executes the tool(s) in order, feeds the results back
 //     → repeat until final text or maxSteps
 //
 // Every step is recorded as a TraceEvent — that trace is the product:
@@ -24,7 +24,8 @@ export interface RunResult {
 
 const DEFAULT_SYSTEM_PROMPT =
   'You are an agent in AgentLab. Use the available tools when they help, ' +
-  'then answer the user in Chinese. One tool call per turn.';
+  'then answer the user in Chinese. You may request several tool calls in one turn; ' +
+  'they will be executed in order and all results fed back together.';
 
 export class Agent {
   private messages: Message[] = [];
@@ -68,25 +69,31 @@ export class Agent {
         return { finalText: reply.content, trace, steps: step };
       }
 
-      // Tool call: record the request, execute, feed the result back.
+      // Tool call(s): one turn may carry several calls. Record them as a
+      // single assistant message, execute sequentially in order, and feed
+      // every result back before the model speaks again.
+      const calls = reply.type === 'toolCalls' ? reply.calls : [reply.call];
       this.messages.push({
         role: 'assistant',
         content: '',
-        toolCall: reply.call,
+        toolCall: calls[0],
+        toolCalls: calls,
       });
-      const outcome = await this.registry.execute(reply.call);
-      this.messages.push({
-        role: 'tool',
-        content: outcome.result,
-        toolCallId: reply.call.id,
-        toolName: reply.call.name,
-      });
-      emit({
-        type: 'toolResult',
-        call: reply.call,
-        result: outcome.result,
-        isError: outcome.isError,
-      });
+      for (const call of calls) {
+        const outcome = await this.registry.execute(call);
+        this.messages.push({
+          role: 'tool',
+          content: outcome.result,
+          toolCallId: call.id,
+          toolName: call.name,
+        });
+        emit({
+          type: 'toolResult',
+          call,
+          result: outcome.result,
+          isError: outcome.isError,
+        });
+      }
     }
 
     const reason = `达到最大步数 ${this.maxSteps}，已停止。`;

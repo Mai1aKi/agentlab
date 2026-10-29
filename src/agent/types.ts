@@ -13,15 +13,20 @@ export interface Message {
   content: string;
   /** Present on assistant messages that request a tool call. */
   toolCall?: ToolCall;
+  /** Present on assistant messages that request several tool calls in
+   *  one turn (Day 1). `toolCall` then mirrors the first entry. */
+  toolCalls?: ToolCall[];
   /** Present on tool messages: which call this result answers. */
   toolCallId?: string;
   toolName?: string;
 }
 
-/** One model turn: either speak to the user, or call one tool. */
+/** One model turn: either speak to the user, call one tool, or call
+ *  several tools at once (executed sequentially by the runtime). */
 export type ModelReply =
   | { type: 'text'; content: string }
-  | { type: 'toolCall'; call: ToolCall };
+  | { type: 'toolCall'; call: ToolCall }
+  | { type: 'toolCalls'; calls: ToolCall[] };
 
 /** The tool description a model sees. Parameter values are type names;
  *  a trailing '?' marks an optional parameter. */

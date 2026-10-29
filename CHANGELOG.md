@@ -1,5 +1,16 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 1 — 2026-10-28
+
+一轮多工具：模型在同一轮里可以一次发出多个工具调用。
+
+- 类型层（`src/agent/types.ts`）：`ModelReply` 新增 `toolCalls` 变体；助手消息可用 `toolCalls` 携带整批调用（`toolCall` 保留兼容，镜像第一个）
+- 运行时（`src/agent/agent.ts`）：一轮的多个调用记为一条助手消息，按顺序逐个执行、逐个产生 `toolResult` 轨迹事件，全部结果回喂后模型才再次发言；系统提示同步改为允许多调用
+- MockModel：能识别一句话里的多件事——例如「计算 3 + 4，现在几点了？」会在同一轮同时发出 calculator + clock，并把两份结果拼成最终回答
+- BYOK（`src/agent/openaiModel.ts`）：OpenAI 响应的多个 `tool_calls` 映射为 `toolCalls` 回复（单个仍用原 `toolCall` 形状）；内部消息转回 OpenAI 格式时完整还原整批调用
+- 控制台轨迹面板：一轮多工具时逐个列出每个工具名与参数；示例新增「计算 3 + 4，现在几点了？」
+- 单元测试新增 3 个（共 29 个）：运行时顺序执行多调用并按 call id 回喂、MockModel 组合问法一轮双工具、BYOK 多 `tool_calls` 映射
+
 ## Day 0 — 2026-10-28
 
 AgentLab 出生。今天落成的地基：

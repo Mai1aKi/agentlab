@@ -11,6 +11,7 @@ const BYOK_KEY = 'agentlab-byok-v1';
 
 const SAMPLES = [
   '计算 (18 + 26) * 3 - 7',
+  '计算 3 + 4，现在几点了？',
   '现在几点了？',
   '什么是 RAG？',
   '介绍一下工具调用',
@@ -83,10 +84,16 @@ function addTrace(event: TraceEvent): void {
       if (event.reply.type === 'text') {
         div.innerHTML = `<span class="t-tag model">步骤 ${event.step} · 模型</span> 直接回复（不调工具）`;
       } else {
+        const calls = event.reply.type === 'toolCalls' ? event.reply.calls : [event.reply.call];
         div.innerHTML =
           `<span class="t-tag model">步骤 ${event.step} · 模型</span> 决定调用工具 ` +
-          `<code>${escapeHtml(event.reply.call.name)}</code>` +
-          `<pre>${escapeHtml(JSON.stringify(event.reply.call.args, null, 2))}</pre>`;
+          calls
+            .map(
+              (c) =>
+                `<code>${escapeHtml(c.name)}</code>` +
+                `<pre>${escapeHtml(JSON.stringify(c.args, null, 2))}</pre>`,
+            )
+            .join('');
       }
       break;
     case 'toolResult':

@@ -82,35 +82,37 @@ export class OpenAiCompatibleModel implements ChatModel {
     const message = data.choices?.[0]?.message;
     if (!message) throw new Error('Model API returned no choices');
 
-    const toolCall = message.tool_calls?.[0];
-    if (toolCall) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
-      } catch {
-        args = {};
-      }
-      return {
-        type: 'toolCall',
-        call: { id: toolCall.id, name: toolCall.function.name, args },
-      };
+    const rawCalls = message.tool_calls ?? [];
+    if (rawCalls.length > 0) {
+      const calls = rawCalls.map((tc) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+        } catch {
+          args = {};
+        }
+        return { id: tc.id, name: tc.function.name, args };
+      });
+      // One call keeps the classic shape; several become a toolCalls reply.
+      return calls.length === 1
+        ? { type: 'toolCall', call: calls[0] }
+        : { type: 'toolCalls', calls };
     }
     return { type: 'text', content: message.content ?? '' };
   }
 }
 
 function toOpenAiMessage(m: Message): Record<string, unknown> {
-  if (m.role === 'assistant' && m.toolCall) {
+  const batch = m.toolCalls ?? (m.toolCall ? [m.toolCall] : []);
+  if (m.role === 'assistant' && batch.length > 0) {
     return {
       role: 'assistant',
       content: '',
-      tool_calls: [
-        {
-          id: m.toolCall.id,
-          type: 'function',
-          function: { name: m.toolCall.name, arguments: JSON.stringify(m.toolCall.args) },
-        },
-      ],
+      tool_calls: batch.map((c) => ({
+        id: c.id,
+        type: 'function',
+        function: { name: c.name, arguments: JSON.stringify(c.args) },
+      })),
     };
   }
   if (m.role === 'tool') {

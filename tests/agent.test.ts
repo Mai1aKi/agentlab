@@ -28,6 +28,48 @@ describe('agent loop with the mock model', () => {
     expect(result.finalText).toMatch(/检索增强|Retrieval/);
   });
 
+  it('executes several tool calls from one model turn, in order', async () => {
+    let turn = 0;
+    const multiModel: ChatModel = {
+      name: 'multi-stub',
+      async complete() {
+        turn++;
+        if (turn === 1) {
+          return {
+            type: 'toolCalls',
+            calls: [
+              { id: 'a', name: 'calculator', args: { expression: '2 + 3' } },
+              { id: 'b', name: 'clock', args: {} },
+            ],
+          };
+        }
+        return { type: 'text', content: 'done' };
+      },
+    };
+    const agent = new Agent(multiModel, createDefaultRegistry());
+    const result = await agent.run('two things at once');
+    expect(result.finalText).toBe('done');
+    expect(result.steps).toBe(2);
+    const kinds = result.trace.map((e) => e.type);
+    expect(kinds).toEqual(['user', 'modelReply', 'toolResult', 'toolResult', 'modelReply', 'final']);
+    const toolEvents = result.trace.filter((e) => e.type === 'toolResult');
+    expect(toolEvents.map((e) => (e.type === 'toolResult' ? e.call.id : ''))).toEqual(['a', 'b']);
+    expect(toolEvents[0]).toMatchObject({ result: '5', isError: false });
+    // Both results are fed back as tool messages answering their own calls.
+    const toolMsgs = agent.history.filter((m) => m.role === 'tool');
+    expect(toolMsgs.map((m) => m.toolCallId)).toEqual(['a', 'b']);
+  });
+
+  it('mock model fires calculator and clock together for a combined ask', async () => {
+    const agent = new Agent(new MockModel(), createDefaultRegistry());
+    const result = await agent.run('计算 3 + 4，现在几点了？');
+    expect(result.steps).toBe(2);
+    const toolEvents = result.trace.filter((e) => e.type === 'toolResult');
+    expect(toolEvents).toHaveLength(2);
+    expect(result.finalText).toContain('3 + 4 = 7');
+    expect(result.finalText).toMatch(/现在的时间是/);
+  });
+
   it('answers chit-chat directly without tools', async () => {
     const agent = new Agent(new MockModel(), createDefaultRegistry());
     const result = await agent.run('你好');

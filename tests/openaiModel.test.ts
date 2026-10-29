@@ -47,6 +47,44 @@ describe('OpenAiCompatibleModel', () => {
     });
   });
 
+  it('maps multiple tool_calls into a toolCalls reply', async () => {
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: fakeFetch({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'calculator', arguments: '{"expression":"1+1"}' },
+                },
+                {
+                  id: 'call_2',
+                  type: 'function',
+                  function: { name: 'clock', arguments: '{}' },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+    const reply = await model.complete([{ role: 'user', content: '计算并报时' }], TOOLS);
+    expect(reply).toEqual({
+      type: 'toolCalls',
+      calls: [
+        { id: 'call_1', name: 'calculator', args: { expression: '1+1' } },
+        { id: 'call_2', name: 'clock', args: {} },
+      ],
+    });
+  });
+
   it('maps plain content into a text reply', async () => {
     const model = new OpenAiCompatibleModel({
       baseUrl: 'https://example.test/v1',
