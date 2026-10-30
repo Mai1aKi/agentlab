@@ -120,6 +120,35 @@ describe('OpenAiCompatibleModel', () => {
     expect(tools[0].function.name).toBe('calculator');
   });
 
+  it('default fetch is bound (browser fetch rejects a foreign receiver)', async () => {
+    // Simulate the browser constraint: native fetch throws
+    // "Illegal invocation" unless its receiver is the global object.
+    const strictFetch = function (this: unknown) {
+      if (this !== globalThis && this !== undefined) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { role: 'assistant', content: 'ok' } }] }),
+      } as Response);
+    };
+    const original = globalThis.fetch;
+    globalThis.fetch = strictFetch as unknown as typeof fetch;
+    try {
+      const model = new OpenAiCompatibleModel({
+        baseUrl: 'https://example.test/v1',
+        apiKey: 'sk-test',
+        model: 'demo',
+        // no fetchFn: the default path is what is under test
+      });
+      const reply = await model.complete([{ role: 'user', content: 'hi' }], TOOLS);
+      expect(reply).toEqual({ type: 'text', content: 'ok' });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it('throws on HTTP errors', async () => {
     const model = new OpenAiCompatibleModel({
       baseUrl: 'https://example.test/v1',

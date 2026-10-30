@@ -36,7 +36,12 @@ export class OpenAiCompatibleModel implements ChatModel {
     this.apiKey = options.apiKey;
     this.modelId = options.model;
     this.name = `byok:${options.model}`;
-    this.fetchFn = options.fetchFn ?? fetch;
+    // Bind the global fetch: stored unbound and later invoked as
+    // this.fetchFn(...), a browser fetch throws "Illegal invocation"
+    // because its receiver is the model instance instead of Window.
+    // (Node's fetch does not care, which is why unit tests missed it —
+    // there is a regression test with a receiver-strict fetch stub.)
+    this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
   }
 
   async complete(messages: Message[], tools: ToolSpec[]): Promise<ModelReply> {
