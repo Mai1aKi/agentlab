@@ -10,34 +10,41 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="logo">🤖</span><span class="brand-name">AgentLab</span><span class="brand-sub">从零手写的 AI Agent 运行时</span></div>
-    <a class="gh-link" href="https://github.com/Mai1aKi/agentlab" target="_blank" rel="noreferrer">GitHub 仓库</a>
+    <div class="topbar-controls">
+      <label class="model-select">
+        <span class="control-label">模型</span>
+        <select id="model-kind">
+          <option value="mock">内置演示模型（规则驱动，零成本）</option>
+          <option value="byok">自定义 API（BYOK，OpenAI 兼容）</option>
+        </select>
+      </label>
+      <a class="gh-link" href="https://github.com/Mai1aKi/agentlab" target="_blank" rel="noreferrer">GitHub 仓库</a>
+    </div>
   </header>
 
-  <section class="settings">
-    <label class="setting-row">
-      <span>模型</span>
-      <select id="model-kind">
-        <option value="mock">内置演示模型（规则驱动，零成本）</option>
-        <option value="byok">自定义 API（BYOK，OpenAI 兼容）</option>
-      </select>
-    </label>
-    <div id="byok-fields" class="byok" hidden>
-      <input id="base-url" type="text" value="https://api.openai.com/v1" aria-label="API 基础地址">
-      <input id="model-name" type="text" placeholder="模型名，如 gpt-4o-mini" aria-label="模型名">
-      <input id="api-key" type="password" placeholder="API Key（只存在你浏览器本地）" aria-label="API Key">
-    </div>
-    <p class="hint">Agent 的循环、工具调用、轨迹记录全部由本仓库手写实现；模型只负责「下一步做什么」。</p>
-  </section>
+  <div id="byok-fields" class="byok-strip" hidden>
+    <input id="base-url" type="text" value="https://api.openai.com/v1" aria-label="API 基础地址">
+    <input id="model-name" type="text" placeholder="模型名，如 gpt-4o-mini" aria-label="模型名">
+    <input id="api-key" type="password" placeholder="API Key（只存在你浏览器本地）" aria-label="API Key">
+  </div>
 
-  <main class="layout">
+  <main class="workspace">
     <section class="chat-panel">
-      <div id="samples" class="samples"></div>
-      <div id="chat" class="chat"></div>
-      <div class="composer">
-        <input id="task-input" type="text" placeholder="给 Agent 一个任务，例如：计算 (18 + 26) * 3">
-        <button id="run-btn" type="button" class="primary">运行</button>
+      <div class="toolbar">
+        <span class="toolbar-label">示例任务</span>
+        <div id="samples" class="samples"></div>
       </div>
-      <div id="status" class="status"></div>
+      <div id="chat" class="chat"></div>
+      <div class="composer-wrap">
+        <div class="composer-inner">
+          <div class="composer">
+            <input id="task-input" type="text" placeholder="给 Agent 一个任务，例如：计算 (18 + 26) * 3">
+            <button id="run-btn" type="button" class="primary">运行</button>
+          </div>
+          <div id="status" class="status"></div>
+          <p class="hint">Agent 的循环、工具调用、轨迹记录全部由本仓库手写实现；模型只负责「下一步做什么」。</p>
+        </div>
+      </div>
     </section>
 
     <aside class="trace-panel">
