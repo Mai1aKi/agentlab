@@ -8,12 +8,20 @@
 // Every step is recorded as a TraceEvent — that trace is the product:
 // it is what the UI visualizes and what tests assert against.
 
+import { compressHistory } from './memory';
 import { ToolRegistry } from './tools';
 import type { ChatModel, Message, TraceEvent } from './types';
 
 export interface AgentOptions {
   maxSteps?: number;
   systemPrompt?: string;
+  /** Compress history once non-system messages exceed this count (Day 2). */
+  maxHistoryMessages?: number;
+  /** How many recent messages stay verbatim when compressing. */
+  keepRecentMessages?: number;
+  /** Custom folder for the messages being compressed; defaults to the
+   *  deterministic extractive summarizer in memory.ts. */
+  summarize?: (messages: readonly Message[]) => Message;
 }
 
 export interface RunResult {
@@ -31,6 +39,9 @@ export class Agent {
   private messages: Message[] = [];
   private readonly maxSteps: number;
   private readonly systemPrompt: string;
+  private readonly maxHistoryMessages: number;
+  private readonly keepRecentMessages: number;
+  private readonly summarize?: AgentOptions['summarize'];
 
   constructor(
     private readonly model: ChatModel,
@@ -39,7 +50,28 @@ export class Agent {
   ) {
     this.maxSteps = options.maxSteps ?? 8;
     this.systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+    this.maxHistoryMessages = options.maxHistoryMessages ?? 24;
+    this.keepRecentMessages = options.keepRecentMessages ?? 10;
+    this.summarize = options.summarize;
     this.messages.push({ role: 'system', content: this.systemPrompt });
+  }
+
+  /** Fold early history into a summary if it grew past the limit. */
+  private maybeCompress(emit: (event: TraceEvent) => void): void {
+    const result = compressHistory(
+      this.messages,
+      this.maxHistoryMessages,
+      this.keepRecentMessages,
+      this.summarize,
+    );
+    if (!result) return;
+    this.messages = result.messages;
+    emit({
+      type: 'memoryCompressed',
+      summarizedCount: result.summarizedCount,
+      keptCount: result.messages.length - 2,
+      summary: result.summary.content,
+    });
   }
 
   get history(): readonly Message[] {
@@ -60,6 +92,7 @@ export class Agent {
     emit({ type: 'user', content: userText });
 
     for (let step = 1; step <= this.maxSteps; step++) {
+      this.maybeCompress(emit);
       const reply = await this.model.complete(this.messages, this.registry.listSpecs());
       emit({ type: 'modelReply', step, reply });
 

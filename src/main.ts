@@ -101,6 +101,11 @@ function addTrace(event: TraceEvent): void {
         `<span class="t-tag ${event.isError ? 'error' : 'tool'}">工具结果</span> ` +
         `<code>${escapeHtml(event.call.name)}</code><pre>${escapeHtml(event.result)}</pre>`;
       break;
+    case 'memoryCompressed':
+      div.innerHTML =
+        `<span class="t-tag tool">记忆压缩</span> 早期 ${event.summarizedCount} 条已摘要，保留最近 ${event.keptCount} 条` +
+        `<pre>${escapeHtml(event.summary)}</pre>`;
+      break;
     case 'final':
       div.innerHTML = `<span class="t-tag final">完成</span> 已生成最终回答`;
       break;
