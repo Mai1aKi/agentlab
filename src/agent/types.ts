@@ -19,14 +19,19 @@ export interface Message {
   /** Present on tool messages: which call this result answers. */
   toolCallId?: string;
   toolName?: string;
+  /** Present on assistant messages that carry a plan (Day 3): the raw
+   *  step titles, in order. The rendered checklist is in `content`. */
+  plan?: string[];
 }
 
 /** One model turn: either speak to the user, call one tool, or call
- *  several tools at once (executed sequentially by the runtime). */
+ *  several tools at once (executed sequentially by the runtime), or —
+ *  before acting — produce a plan checklist (Day 3, Planner-Executor). */
 export type ModelReply =
   | { type: 'text'; content: string }
   | { type: 'toolCall'; call: ToolCall }
-  | { type: 'toolCalls'; calls: ToolCall[] };
+  | { type: 'toolCalls'; calls: ToolCall[] }
+  | { type: 'plan'; steps: string[] };
 
 /** The tool description a model sees. Parameter values are type names;
  *  a trailing '?' marks an optional parameter. */
@@ -49,5 +54,7 @@ export type TraceEvent =
   | { type: 'modelReply'; step: number; reply: ModelReply }
   | { type: 'toolResult'; call: ToolCall; result: string; isError: boolean }
   | { type: 'memoryCompressed'; summarizedCount: number; keptCount: number; summary: string }
+  | { type: 'planCreated'; steps: string[] }
+  | { type: 'planStepDone'; index: number; title: string }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

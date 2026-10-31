@@ -22,17 +22,17 @@ export class MockModel implements ChatModel {
 
     // Collect every tool this turn needs — Day 1: one turn, several calls.
     let nextId = messages.filter((m) => m.toolCall).length + 1;
-    const calls: { name: string; args: Record<string, unknown> }[] = [];
+    const calls: { name: string; args: Record<string, unknown>; title: string }[] = [];
 
     // 1) Arithmetic? Extract and delegate to the calculator tool.
     const expr = extractExpression(userText);
     if (expr) {
-      calls.push({ name: 'calculator', args: { expression: expr } });
+      calls.push({ name: 'calculator', args: { expression: expr }, title: `用 calculator 计算 ${expr}` });
     }
 
     // 2) Asking for the time?
     if (/几点|时间|日期|星期/.test(userText)) {
-      calls.push({ name: 'clock', args: {} });
+      calls.push({ name: 'clock', args: {}, title: '用 clock 查询当前时间' });
     }
 
     // 3) Asking a knowledge question?
@@ -41,7 +41,18 @@ export class MockModel implements ChatModel {
         .replace(/什么是|查一下|搜索|查一查|介绍一下|讲讲|解释|请问|帮我|一下/g, '')
         .replace(/[？?：:，,。\s]+/g, ' ')
         .trim();
-      calls.push({ name: 'kb_search', args: { query: query || userText } });
+      calls.push({ name: 'kb_search', args: { query: query || userText }, title: `用 kb_search 检索「${query || userText}」` });
+    }
+
+    // Day 3 · Planner-Executor: with several things to do and no plan yet
+    // in this turn, first reply with the plan checklist; the runtime will
+    // tick each step off as its tool call finishes. On the next turn the
+    // plan is already in the history, so we fall through and execute.
+    const planAlreadyMade = messages
+      .slice(lastUserIdx + 1)
+      .some((m) => m.plan && m.plan.length > 0);
+    if (calls.length > 1 && !planAlreadyMade) {
+      return { type: 'plan', steps: calls.map((c) => c.title) };
     }
 
     if (calls.length === 1) {
@@ -65,7 +76,7 @@ export class MockModel implements ChatModel {
         '· 给我一道算式，我会调用 calculator 计算，例如「计算 (18 + 26) * 3」\n' +
         '· 问我「现在几点」，我会调用 clock\n' +
         '· 问我「什么是 RAG」，我会调用 kb_search 检索知识库\n' +
-        '· 一句话里问两件事，例如「计算 3 + 4，现在几点」，我会在同一轮同时调用多个工具\n' +
+        '· 一句话里问两件事，例如「计算 3 + 4，现在几点」，我会先列一份计划清单，再逐个执行并勾销\n' +
         '想接真模型的话，在上方把模型切换成「自定义 API（BYOK）」。',
     };
   }

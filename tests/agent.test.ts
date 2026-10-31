@@ -63,11 +63,60 @@ describe('agent loop with the mock model', () => {
   it('mock model fires calculator and clock together for a combined ask', async () => {
     const agent = new Agent(new MockModel(), createDefaultRegistry());
     const result = await agent.run('计算 3 + 4，现在几点了？');
-    expect(result.steps).toBe(2);
+    // Day 3: plan first, then the combined tool turn, then the final text.
+    expect(result.steps).toBe(3);
     const toolEvents = result.trace.filter((e) => e.type === 'toolResult');
     expect(toolEvents).toHaveLength(2);
     expect(result.finalText).toContain('3 + 4 = 7');
     expect(result.finalText).toMatch(/现在的时间是/);
+  });
+
+  it('planner-executor: plan first, then steps ticked off as tools finish', async () => {
+    let turn = 0;
+    const plannerModel: ChatModel = {
+      name: 'planner-stub',
+      async complete() {
+        turn++;
+        if (turn === 1) return { type: 'plan', steps: ['算一题', '看时间'] };
+        if (turn === 2) {
+          return {
+            type: 'toolCalls',
+            calls: [
+              { id: 'p1', name: 'calculator', args: { expression: '1 + 2' } },
+              { id: 'p2', name: 'clock', args: {} },
+            ],
+          };
+        }
+        return { type: 'text', content: '全部完成' };
+      },
+    };
+    const agent = new Agent(plannerModel, createDefaultRegistry());
+    const result = await agent.run('先算再看时间');
+    expect(result.finalText).toBe('全部完成');
+    const kinds = result.trace.map((e) => e.type);
+    expect(kinds).toEqual([
+      'user',
+      'modelReply',
+      'planCreated',
+      'modelReply',
+      'toolResult',
+      'planStepDone',
+      'toolResult',
+      'planStepDone',
+      'modelReply',
+      'final',
+    ]);
+    expect(result.plan?.map((p) => p.status)).toEqual(['done', 'done']);
+    const doneEvents = result.trace.filter((e) => e.type === 'planStepDone');
+    expect(doneEvents.map((e) => (e.type === 'planStepDone' ? e.index : -1))).toEqual([0, 1]);
+  });
+
+  it('mock model plans a combined ask and ticks every step off', async () => {
+    const agent = new Agent(new MockModel(), createDefaultRegistry());
+    const result = await agent.run('计算 3 + 4，现在几点了？');
+    const created = result.trace.find((e) => e.type === 'planCreated');
+    expect(created?.type === 'planCreated' ? created.steps : []).toHaveLength(2);
+    expect(result.plan?.every((p) => p.status === 'done')).toBe(true);
   });
 
   it('answers chit-chat directly without tools', async () => {

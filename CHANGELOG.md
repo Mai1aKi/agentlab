@@ -1,5 +1,16 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 3 — 2026-10-30
+
+Planner-Executor：先让模型产出计划清单，再逐步执行并勾销。
+
+- 计划模块（`src/agent/planner.ts`）：纯函数清单——`createPlan`（去空白步、全部待办）、`completeStep`（不可变地勾销一步）、`nextPending` / `isPlanComplete`、`formatPlan`（`[ ]` / `[x]` 渲染）
+- 类型层（`src/agent/types.ts`）：`ModelReply` 新增 `plan` 变体；助手消息可带 `plan` 步标题；轨迹新增 `planCreated`（计划全文）与 `planStepDone`（勾销的步号与标题）事件
+- 运行时（`src/agent/agent.ts`）：收到 plan 回复先记录计划并继续循环；之后每个工具调用执行完毕才勾销下一个待办步（先做完、后勾销，不预勾）；`RunResult.plan` 返回最终清单，未做完的步保持 pending；系统提示同步说明可先给计划
+- MockModel：一句话含多件事时先回计划清单（每步对应一个待执行的工具调用），下一轮再按原多工具逻辑一并执行；单件事不列计划，原有行为不变
+- 控制台轨迹面板：模型计划与 `planCreated` 展示清单，`planStepDone` 展示「第 N 步已完成」
+- 单元测试新增 5 个（共 42 个）：计划清单的创建/纯函数勾销/格式化、存根模型的计划→执行→逐个勾销轨迹顺序、MockModel 组合问法的计划全勾销
+
 ## 2026-10-30 · 仓库维护（工作流自检）
 
 完成一次仓库工作流自检：新建并关闭 issue #1 验证 issue 流程，并用 PR 合并本文档小记。功能不变。

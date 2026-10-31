@@ -9,6 +9,7 @@
 // it is what the UI visualizes and what tests assert against.
 
 import { compressHistory } from './memory';
+import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
 import { ToolRegistry } from './tools';
 import type { ChatModel, Message, TraceEvent } from './types';
 
@@ -28,12 +29,17 @@ export interface RunResult {
   finalText: string;
   trace: TraceEvent[];
   steps: number;
+  /** The plan for this run, if the model produced one (Day 3). Items are
+   *  ticked off as their tool calls finish; unfinished items stay pending. */
+  plan?: PlanItem[];
 }
 
 const DEFAULT_SYSTEM_PROMPT =
   'You are an agent in AgentLab. Use the available tools when they help, ' +
   'then answer the user in Chinese. You may request several tool calls in one turn; ' +
-  'they will be executed in order and all results fed back together.';
+  'they will be executed in order and all results fed back together. ' +
+  'For a task with several parts, you may first reply with a plan checklist; ' +
+  'the runtime will then tick each step off as its work finishes.';
 
 export class Agent {
   private messages: Message[] = [];
@@ -91,15 +97,31 @@ export class Agent {
     this.messages.push({ role: 'user', content: userText });
     emit({ type: 'user', content: userText });
 
+    // Day 3 · Planner-Executor: a plan reply is recorded (not acted on
+    // directly); afterwards each executed tool call ticks off the next
+    // pending plan step, in order.
+    let plan: PlanItem[] | undefined;
+
     for (let step = 1; step <= this.maxSteps; step++) {
       this.maybeCompress(emit);
       const reply = await this.model.complete(this.messages, this.registry.listSpecs());
       emit({ type: 'modelReply', step, reply });
 
+      if (reply.type === 'plan') {
+        plan = createPlan(reply.steps);
+        this.messages.push({
+          role: 'assistant',
+          content: `【计划】\n${formatPlan(plan)}`,
+          plan: plan.map((p) => p.title),
+        });
+        emit({ type: 'planCreated', steps: plan.map((p) => p.title) });
+        continue;
+      }
+
       if (reply.type === 'text') {
         this.messages.push({ role: 'assistant', content: reply.content });
         emit({ type: 'final', content: reply.content });
-        return { finalText: reply.content, trace, steps: step };
+        return { finalText: reply.content, trace, steps: step, plan };
       }
 
       // Tool call(s): one turn may carry several calls. Record them as a
@@ -126,11 +148,19 @@ export class Agent {
           result: outcome.result,
           isError: outcome.isError,
         });
+        // Tick off the next plan step now that this call has finished.
+        if (plan) {
+          const pending = nextPending(plan);
+          if (pending) {
+            plan = completeStep(plan, pending.index);
+            emit({ type: 'planStepDone', index: pending.index, title: pending.title });
+          }
+        }
       }
     }
 
     const reason = `达到最大步数 ${this.maxSteps}，已停止。`;
     emit({ type: 'stopped', reason });
-    return { finalText: reason, trace, steps: this.maxSteps };
+    return { finalText: reason, trace, steps: this.maxSteps, plan };
   }
 }

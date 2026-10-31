@@ -83,6 +83,10 @@ function addTrace(event: TraceEvent): void {
     case 'modelReply':
       if (event.reply.type === 'text') {
         div.innerHTML = `<span class="t-tag model">步骤 ${event.step} · 模型</span> 直接回复（不调工具）`;
+      } else if (event.reply.type === 'plan') {
+        div.innerHTML =
+          `<span class="t-tag model">步骤 ${event.step} · 模型</span> 先制定计划` +
+          `<pre>${escapeHtml(event.reply.steps.map((s, i) => `${i + 1}. [ ] ${s}`).join('\n'))}</pre>`;
       } else {
         const calls = event.reply.type === 'toolCalls' ? event.reply.calls : [event.reply.call];
         div.innerHTML =
@@ -100,6 +104,14 @@ function addTrace(event: TraceEvent): void {
       div.innerHTML =
         `<span class="t-tag ${event.isError ? 'error' : 'tool'}">工具结果</span> ` +
         `<code>${escapeHtml(event.call.name)}</code><pre>${escapeHtml(event.result)}</pre>`;
+      break;
+    case 'planCreated':
+      div.innerHTML =
+        `<span class="t-tag tool">计划</span> 共 ${event.steps.length} 步，开始逐步执行` +
+        `<pre>${escapeHtml(event.steps.map((s, i) => `${i + 1}. [ ] ${s}`).join('\n'))}</pre>`;
+      break;
+    case 'planStepDone':
+      div.innerHTML = `<span class="t-tag final">勾销计划</span> 第 ${event.index + 1} 步已完成：${escapeHtml(event.title)}`;
       break;
     case 'memoryCompressed':
       div.innerHTML =
