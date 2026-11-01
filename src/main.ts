@@ -5,7 +5,11 @@ import { createDefaultRegistry } from './agent/builtinTools';
 import { MockModel } from './agent/mockModel';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
 import type { ChatModel, TraceEvent } from './agent/types';
+import { initParticles } from './particles';
 import './style.css';
+
+const bgCanvas = document.getElementById('bg-particles');
+if (bgCanvas) initParticles(bgCanvas as HTMLCanvasElement);
 
 const BYOK_KEY = 'agentlab-byok-v1';
 

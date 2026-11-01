@@ -43,6 +43,15 @@ body {
 
 ::selection { background: rgba(255, 255, 255, 0.16); }
 
+/* ambient particle canvas: fixed behind the whole app shell */
+#bg-particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.topbar, .byok-strip, .workspace { position: relative; z-index: 1; }
+
 /* ---------- top bar ---------- */
 
 .topbar {
