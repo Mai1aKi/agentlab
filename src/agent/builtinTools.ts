@@ -2,6 +2,7 @@
 // search over hand-written notes about AI / CS topics.
 
 import { ToolRegistry, type Tool} from './tools';
+import { chunkText, createTfIdfIndex, type RagHit } from './rag';
 
 // ---------- calculator: a real little expression parser (no eval) ----------
 
@@ -163,49 +164,82 @@ content:
 },
 ];
 
-/** Bigrams over CJK runs only. Latin text is matched through the keyword
- *  rules instead — shared Latin bigrams ("ch", "he", "ma" in "schema")
- *  otherwise produce confident-looking false hits. */
-function bigrams(text: string): string[] {
-const grams: string[] = [];
-const runs = text.match(/[\u4e00-\u9fff]+/g) ?? [];
-for (const run of runs) {
-for (let i = 0; i < run.length - 1; i++) grams.push(run.slice(i, i + 2));
-}
-return grams;
+// ---------- Day 4: TF-IDF retrieval over chunks + custom documents ----------
+
+/** Custom documents imported at runtime (via kb_import or the API
+ *  below). They join the built-in entries in the same TF-IDF index. */
+const customEntries: KbEntry[] = [];
+
+export function importKnowledgeDocument(title: string, content: string): { entry: KbEntry; chunkCount: number } {
+const cleanTitle = title.trim();
+const cleanContent = content.trim();
+if (cleanTitle.length === 0) throw new Error('Document title must not be empty');
+if (cleanContent.length === 0) throw new Error('Document content must not be empty');
+const entry: KbEntry = { title: cleanTitle, keywords: [], content: cleanContent };
+customEntries.push(entry);
+return { entry, chunkCount: chunkText(cleanContent).length };
 }
 
-export function searchKnowledgeBase(query: string): KbEntry[] {
-const q = query.toLowerCase();
-const qClean = q.replace(/\s+/g, '');
-const qGrams = new Set(bigrams(query));
-const scored = KNOWLEDGE_BASE.map((entry) => {
-let score = 0;
-for (const kw of entry.keywords) {
-const kwClean = kw.toLowerCase().replace(/\s+/g, '');
-if (qClean.includes(kwClean)) score += 10;
-if (kwClean.includes(qClean) && qClean.length >= 2) score += 6;
+export function clearCustomKnowledge(): void {
+customEntries.length = 0;
 }
-const haystack = new Set(bigrams(entry.title + entry.content));
-for (const g of qGrams) if (haystack.has(g)) score += 1;
-return { entry, score};
-// Bigram overlap alone is weak evidence (stray bigrams like "at" appear
-// in unrelated English words), so a minimum total score is required.
-}).filter((s) => s.score >= 3);
-scored.sort((a, b) => b.score - a.score);
-return scored.slice(0, 2).map((s) => s.entry);
+
+export function listCustomKnowledge(): KbEntry[] {
+return [...customEntries];
+}
+
+function allEntries(): KbEntry[] {
+return [...KNOWLEDGE_BASE, ...customEntries];
+}
+
+function buildIndex() {
+return createTfIdfIndex(allEntries().map((e) => ({ title: e.title, text: e.content })));
+}
+
+/** Chunk-level TF-IDF search: the actual RAG retrieval step. */
+export function searchKnowledgeChunks(query: string, topK = 3): RagHit[] {
+return buildIndex().search(query, topK);
+}
+
+/** Entry-level search kept for existing callers: chunk hits are mapped
+ *  back to their entries, best first, duplicates removed. */
+export function searchKnowledgeBase(query: string): KbEntry[] {
+const entries = allEntries();
+const seen = new Set<string>();
+const result: KbEntry[] = [];
+for (const hit of buildIndex().search(query, 6)) {
+if (seen.has(hit.title)) continue;
+const entry = entries.find((e) => e.title === hit.title);
+if (!entry) continue;
+seen.add(hit.title);
+result.push(entry);
+if (result.length >= 2) break;
+}
+return result;
 }
 
 export const kbSearchTool: Tool = {
 spec: {
 name: 'kb_search',
-description: 'Search the built-in knowledge base about AI / CS topics (RAG, Agent, embedding, B+ tree,...).',
+description: 'Search the knowledge base (built-in AI / CS notes plus imported custom documents) with TF-IDF over document chunks.',
 parameters: { query: 'string'},
 },
 run: (args) => {
-const hits = searchKnowledgeBase(String(args.query));
+const hits = searchKnowledgeChunks(String(args.query));
 if (hits.length === 0) return '知识库里没有找到相关条目。';
-return hits.map((h) => `${h.content}`).join('\n');
+return hits.map((h) => `【${h.title}】${h.text}`).join('\n');
+},
+};
+
+export const kbImportTool: Tool = {
+spec: {
+name: 'kb_import',
+description: 'Import a custom text document into the knowledge base so kb_search can retrieve it afterwards.',
+parameters: { title: 'string', content: 'string'},
+},
+run: (args) => {
+const { entry, chunkCount } = importKnowledgeDocument(String(args.title), String(args.content));
+return `已导入《${entry.title}》，切成 ${chunkCount} 个片段，现可用 kb_search 检索。`;
 },
 };
 
@@ -213,5 +247,6 @@ export function createDefaultRegistry(): ToolRegistry {
 return new ToolRegistry()
 .register(calculatorTool)
 .register(clockTool)
-.register(kbSearchTool);
+.register(kbSearchTool)
+.register(kbImportTool);
 }

@@ -57,7 +57,7 @@ describe('tool registry', () => {
 
   it('lists specs for all built-in tools', () => {
     const specs = createDefaultRegistry().listSpecs();
-    expect(specs.map((s) => s.name)).toEqual(['calculator', 'clock', 'kb_search']);
+    expect(specs.map((s) => s.name)).toEqual(['calculator', 'clock', 'kb_search', 'kb_import']);
   });
 });
 

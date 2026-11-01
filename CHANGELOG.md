@@ -1,5 +1,14 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 4 — 2026-10-31
+
+RAG 工具升级：文档切分 + TF-IDF 检索替换关键词匹配，知识库可导入自定义文本。
+
+- RAG 模块（`src/agent/rag.ts`）：纯函数——`tokenize`（英文词整体保留含尾随 `+`、中文按单字 + bigram 切分）、`chunkText`（按段落 → 句子打包切分，超长句带 overlap 硬切）、`createTfIdfIndex`（逐片段建 TF-IDF 向量 + 平滑 IDF，查询走余弦相似度，低于阈值视为无证据）
+- 检索层（`src/agent/builtinTools.ts`）：kb_search 改为片段级 TF-IDF 检索（`searchKnowledgeChunks` 返回带分数的片段），删除旧的关键词 + bigram 打分；`searchKnowledgeBase` 保留条目级接口，由片段命中去重映射回条目
+- 自定义导入：新增 `kb_import` 工具与 `importKnowledgeDocument` / `clearCustomKnowledge` / `listCustomKnowledge` API——导入的文本与内置 6 篇笔记进同一索引、同样切分检索；空标题 / 空正文会被拒绝
+- 单元测试新增 13 个（共 55 个）：切分（段落 / 句子打包 / 带重叠硬切）、TF-IDF 的 TF 排序与 IDF 稀有词命中、无重叠查询为空、导入文档的后段片段可检索、经注册表 kb_import → kb_search 全链路
+
 ## Day 3 — 2026-10-30
 
 Planner-Executor：先让模型产出计划清单，再逐步执行并勾销。
