@@ -4,6 +4,7 @@ import { Agent } from './agent/agent';
 import { createDefaultRegistry } from './agent/builtinTools';
 import { MockModel } from './agent/mockModel';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
+import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
 import './style.css';
@@ -33,6 +34,12 @@ const traceEl = document.getElementById('trace') as HTMLDivElement;
 const inputEl = document.getElementById('task-input') as HTMLInputElement;
 const runBtn = document.getElementById('run-btn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLDivElement;
+const exportTraceBtn = document.getElementById('export-trace-btn') as HTMLButtonElement;
+const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButtonElement;
+const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
+
+/** The most recent run's trace, for export (Day 5). */
+let lastTrace: TraceEvent[] = [];
 
 // Restore BYOK settings (key stays in this browser's localStorage only).
 try {
@@ -143,8 +150,12 @@ async function runTask(text: string): Promise<void> {
   const model = currentModel();
   const agent = new Agent(model, createDefaultRegistry());
   const started = performance.now();
+  lastTrace = [];
   try {
-    const result = await agent.run(task, addTrace);
+    const result = await agent.run(task, (event) => {
+      lastTrace.push(event);
+      addTrace(event);
+    });
     addBubble('assistant', result.finalText);
     statusEl.textContent = `模型：${model.name} · 步数：${result.steps} · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
   } catch (e) {
@@ -156,6 +167,39 @@ async function runTask(text: string): Promise<void> {
     runBtn.disabled = false;
   }
 }
+
+exportTraceBtn.addEventListener('click', () => {
+  if (lastTrace.length === 0) {
+    statusEl.textContent = '暂无可导出的轨迹，先运行一次任务。';
+    return;
+  }
+  const blob = new Blob([serializeTrace(lastTrace)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'agentlab-trace.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  statusEl.textContent = `已导出轨迹：${lastTrace.length} 个事件`;
+});
+
+importTraceBtn.addEventListener('click', () => importTraceFile.click());
+importTraceFile.addEventListener('change', () => {
+  const file = importTraceFile.files?.[0];
+  importTraceFile.value = '';
+  if (!file) return;
+  void file.text().then((text) => {
+    try {
+      const events = parseTrace(text);
+      traceEl.innerHTML = '';
+      lastTrace = [...events];
+      const count = replayTrace(events, addTrace);
+      statusEl.textContent = `已回放导入的轨迹：${count} 个事件`;
+    } catch (e) {
+      statusEl.textContent = `导入失败：${e instanceof Error ? e.message : String(e)}`;
+    }
+  });
+});
 
 for (const sample of SAMPLES) {
   const chip = document.createElement('button');
