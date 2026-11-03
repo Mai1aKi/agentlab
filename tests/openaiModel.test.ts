@@ -149,6 +149,60 @@ describe('OpenAiCompatibleModel', () => {
     }
   });
 
+  it('retries on 503 and succeeds when the provider recovers', async () => {
+    let calls = 0;
+    const flakyFetch = (async () => {
+      calls++;
+      if (calls < 3) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({}),
+          text: async () => 'high demand',
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { role: 'assistant', content: 'recovered' } }] }),
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: flakyFetch,
+      retryDelayMs: 1,
+    });
+    const reply = await model.complete([{ role: 'user', content: 'hi' }], TOOLS);
+    expect(reply).toEqual({ type: 'text', content: 'recovered' });
+    expect(calls).toBe(3);
+  });
+
+  it('gives up after 3 attempts on persistent 503', async () => {
+    let calls = 0;
+    const downFetch = (async () => {
+      calls++;
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+        text: async () => 'still down',
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: downFetch,
+      retryDelayMs: 1,
+    });
+    await expect(model.complete([{ role: 'user', content: 'hi' }], TOOLS)).rejects.toThrowError(
+      /HTTP 503 — still down/,
+    );
+    expect(calls).toBe(3);
+  });
+
   it('includes the provider error body in the thrown error', async () => {
     const bodyFetch = (async () =>
       ({

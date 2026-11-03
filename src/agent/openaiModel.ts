@@ -10,6 +10,8 @@ export interface OpenAiModelOptions {
   model: string;
   /** Injectable for tests; defaults to the global fetch. */
   fetchFn?: typeof fetch;
+  /** Base delay between retries on 429/503, in ms. Default 900. */
+  retryDelayMs?: number;
 }
 
 interface OpenAiToolCall {
@@ -30,6 +32,7 @@ export class OpenAiCompatibleModel implements ChatModel {
   private readonly apiKey: string;
   private readonly modelId: string;
   private readonly fetchFn: typeof fetch;
+  private readonly retryDelayMs: number;
 
   constructor(options: OpenAiModelOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
@@ -42,16 +45,11 @@ export class OpenAiCompatibleModel implements ChatModel {
     // (Node's fetch does not care, which is why unit tests missed it —
     // there is a regression test with a receiver-strict fetch stub.)
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
+    this.retryDelayMs = options.retryDelayMs ?? 900;
   }
 
   async complete(messages: Message[], tools: ToolSpec[]): Promise<ModelReply> {
-    const response = await this.fetchFn(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
+    const requestBody = JSON.stringify({
         model: this.modelId,
         messages: messages.map(toOpenAiMessage),
         tools: tools.map((t) => ({
@@ -74,8 +72,27 @@ export class OpenAiCompatibleModel implements ChatModel {
           },
         })),
         tool_choice: 'auto',
-      }),
     });
+
+    // Free-tier endpoints often answer 429/503 under load spikes; those
+    // are transient, so retry a couple of times with growing delays
+    // before surfacing the error.
+    const MAX_ATTEMPTS = 3;
+    let response: Response | undefined;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      response = await this.fetchFn(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: requestBody,
+      });
+      const retryable = response.status === 429 || response.status === 503;
+      if (!retryable || attempt === MAX_ATTEMPTS) break;
+      await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs * attempt));
+    }
+    if (!response) throw new Error('Model API request did not run');
 
     if (!response.ok) {
       // Surface the provider's own explanation — a bare "HTTP 404" does
