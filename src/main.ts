@@ -8,6 +8,7 @@ import { OpenAiCompatibleModel } from './agent/openaiModel';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
+import { renderMarkdown } from './markdown';
 import './style.css';
 
 const bgCanvas = document.getElementById('bg-particles');
@@ -81,7 +82,11 @@ modelKindEl.addEventListener('change', () => {
 function addBubble(role: 'user' | 'assistant', text: string): void {
   const div = document.createElement('div');
   div.className = `bubble ${role}`;
-  div.textContent = text;
+  // Assistant replies are Markdown (real models answer in it); the
+  // renderer escapes first, so this innerHTML is safe. User text stays
+  // literal.
+  if (role === 'assistant') div.innerHTML = renderMarkdown(text);
+  else div.textContent = text;
   chatEl.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
