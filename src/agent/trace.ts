@@ -20,6 +20,8 @@ const EVENT_TYPES = new Set([
   'memoryCompressed',
   'planCreated',
   'planStepDone',
+  'subAgentStarted',
+  'subAgentDone',
   'final',
   'stopped',
 ]);

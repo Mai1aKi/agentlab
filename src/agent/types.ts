@@ -56,5 +56,7 @@ export type TraceEvent =
   | { type: 'memoryCompressed'; summarizedCount: number; keptCount: number; summary: string }
   | { type: 'planCreated'; steps: string[] }
   | { type: 'planStepDone'; index: number; title: string }
+  | { type: 'subAgentStarted'; role: 'researcher' | 'writer'; instruction: string }
+  | { type: 'subAgentDone'; role: 'researcher' | 'writer'; summary: string }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

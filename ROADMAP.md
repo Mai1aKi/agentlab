@@ -9,6 +9,6 @@
 - [x] Day 3 · Planner-Executor：先让模型产出计划清单，再逐步执行并勾销
 - [x] Day 4 · RAG 工具升级：文档切分 + TF-IDF 检索替换关键词匹配，知识库可导入自定义文本
 - [x] Day 5 · 轨迹导出 / 回放：把一次运行的轨迹存为 JSON，可导入重播
-- [ ] Day 6 · 多 Agent 协作：researcher 负责检索、writer 负责成文，主 Agent 调度
+- [x] Day 6 · 多 Agent 协作：researcher 负责检索、writer 负责成文，主 Agent 调度
 - [ ] Day 7 · 评测台：内置任务集一键跑批，统计工具调用正确率与步数
 - [ ] Day 8 · 流式输出：BYOK 模式下接入 streaming，回答逐字显示

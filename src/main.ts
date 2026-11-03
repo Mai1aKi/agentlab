@@ -3,6 +3,7 @@
 import { Agent } from './agent/agent';
 import { createDefaultRegistry } from './agent/builtinTools';
 import { MockModel } from './agent/mockModel';
+import { runMultiAgent } from './agent/multiAgent';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
@@ -19,6 +20,7 @@ const SAMPLES = [
   '计算 3 + 4，现在几点了？',
   '现在几点了？',
   '什么是 RAG？',
+  '多 Agent 协作：什么是 RAG',
   '介绍一下工具调用',
   '你好，你能做什么？',
 ];
@@ -124,6 +126,12 @@ function addTrace(event: TraceEvent): void {
     case 'planStepDone':
       div.innerHTML = `<span class="t-tag final">勾销计划</span> 第 ${event.index + 1} 步已完成：${escapeHtml(event.title)}`;
       break;
+    case 'subAgentStarted':
+      div.innerHTML = `<span class="t-tag model">子 Agent</span> ${escapeHtml(event.role)} 开始：${escapeHtml(event.instruction)}`;
+      break;
+    case 'subAgentDone':
+      div.innerHTML = `<span class="t-tag final">子 Agent</span> ${escapeHtml(event.role)} 完成：${escapeHtml(event.summary)}`;
+      break;
     case 'memoryCompressed':
       div.innerHTML =
         `<span class="t-tag tool">记忆压缩</span> 早期 ${event.summarizedCount} 条已摘要，保留最近 ${event.keptCount} 条` +
@@ -147,6 +155,34 @@ async function runTask(text: string): Promise<void> {
   running = true;
   runBtn.disabled = true;
   addBubble('user', task);
+  // Day 6 · Multi-agent mode: a "多 Agent 协作：<主题>" task is handled
+  // by the coordinator (researcher retrieves, writer composes) instead
+  // of the single-agent loop.
+  const teamPrefix = '多 Agent 协作：';
+  if (task.startsWith(teamPrefix)) {
+    const topic = task.slice(teamPrefix.length).trim();
+    const started = performance.now();
+    lastTrace = [];
+    try {
+      const emitTeam = (event: TraceEvent) => {
+        lastTrace.push(event);
+        addTrace(event);
+      };
+      emitTeam({ type: 'user', content: task });
+      const team = await runMultiAgent(topic, emitTeam);
+      emitTeam({ type: 'final', content: team.draft });
+      addBubble('assistant', team.draft);
+      statusEl.textContent = `多 Agent 协作 · researcher 找到 ${team.findings.length} 条资料 · writer 已成文 · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      addBubble('assistant', `运行出错：${message}`);
+      statusEl.textContent = `出错：${message}`;
+    } finally {
+      running = false;
+      runBtn.disabled = false;
+    }
+    return;
+  }
   const model = currentModel();
   const agent = new Agent(model, createDefaultRegistry());
   const started = performance.now();

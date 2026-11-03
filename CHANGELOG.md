@@ -1,5 +1,14 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 6 — 2026-11-02
+
+多 Agent 协作：researcher 负责检索、writer 负责成文，主 Agent 调度。
+
+- 协作模块（`src/agent/multiAgent.ts`）：主 Agent 调度——`delegateTasks` 把一个主题拆成两件子任务（researcher 先检索、writer 后成文，空主题不分派）；`composeDraft` 是 writer，只用 researcher 给的资料成文、没资料时直说找不到、不编造；`runMultiAgent` 按序跑 researcher → writer，检索函数可注入以便测试
+- 轨迹（`src/agent/types.ts` + `src/agent/trace.ts`）：新增 `subAgentStarted`（角色 + 指令）与 `subAgentDone`（角色 + 小结）事件，导出 / 回放的事件白名单同步放行这两种新事件
+- 控制台（`src/main.ts`）：新增示例「多 Agent 协作：什么是 RAG」——以该前缀开头的任务走协作模式：轨迹面板逐条展示两个子 Agent 的开始与完成，最终气泡是 writer 的短文，状态栏报 researcher 找到的资料条数；普通任务仍走原单 Agent 循环
+- 单元测试新增 4 个（共 66 个）：分派顺序与空主题、writer 只凭资料成文与无资料时的直说、注入检索下 researcher→writer 的事件顺序与资料传递、用真实知识库检索 RAG 并拒绝空主题
+
 ## Day 5 — 2026-11-01
 
 轨迹导出 / 回放：把一次运行的轨迹存为 JSON，可导入重播。
