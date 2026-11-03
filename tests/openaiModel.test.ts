@@ -149,6 +149,25 @@ describe('OpenAiCompatibleModel', () => {
     }
   });
 
+  it('includes the provider error body in the thrown error', async () => {
+    const bodyFetch = (async () =>
+      ({
+        ok: false,
+        status: 404,
+        json: async () => ({}),
+        text: async () => '{"error":{"message":"models/nope is not found"}}',
+      }) as unknown as Response) as typeof fetch;
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'nope',
+      fetchFn: bodyFetch,
+    });
+    await expect(model.complete([{ role: 'user', content: 'hi' }], TOOLS)).rejects.toThrowError(
+      /HTTP 404 — .*models\/nope is not found/,
+    );
+  });
+
   it('throws on HTTP errors', async () => {
     const model = new OpenAiCompatibleModel({
       baseUrl: 'https://example.test/v1',

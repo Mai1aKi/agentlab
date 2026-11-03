@@ -78,7 +78,16 @@ export class OpenAiCompatibleModel implements ChatModel {
     });
 
     if (!response.ok) {
-      throw new Error(`Model API error: HTTP ${response.status}`);
+      // Surface the provider's own explanation — a bare "HTTP 404" does
+      // not say whether the base URL, the model name, or the key is wrong,
+      // and providers do say it in the body.
+      let detail = '';
+      try {
+        detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300);
+      } catch {
+        // body unreadable — the status alone will have to do
+      }
+      throw new Error(`Model API error: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`);
     }
 
     const data = (await response.json()) as {
