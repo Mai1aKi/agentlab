@@ -2,6 +2,7 @@
 
 import { Agent } from './agent/agent';
 import { createDefaultRegistry } from './agent/builtinTools';
+import { formatEvalReport, runEvalSuite } from './agent/eval';
 import { MockModel } from './agent/mockModel';
 import { runMultiAgent } from './agent/multiAgent';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
@@ -22,6 +23,7 @@ const SAMPLES = [
   '现在几点了？',
   '什么是 RAG？',
   '多 Agent 协作：什么是 RAG',
+  '评测台：跑一遍内置任务集',
   '介绍一下工具调用',
   '你好，你能做什么？',
 ];
@@ -160,6 +162,33 @@ async function runTask(text: string): Promise<void> {
   running = true;
   runBtn.disabled = true;
   addBubble('user', task);
+  // Day 7 · Evaluation bench: a "评测台…" task runs the built-in task
+  // set once through the demo model and reports tool-call accuracy.
+  if (task.startsWith('评测台')) {
+    const started = performance.now();
+    lastTrace = [];
+    try {
+      lastTrace.push({ type: 'user', content: task });
+      addTrace({ type: 'user', content: task });
+      const suite = await runEvalSuite(async (prompt) => {
+        const bench = new Agent(new MockModel(), createDefaultRegistry());
+        return bench.run(prompt);
+      });
+      const report = formatEvalReport(suite.results, suite.summary);
+      lastTrace.push({ type: 'final', content: report });
+      addTrace({ type: 'final', content: report });
+      addBubble('assistant', report);
+      statusEl.textContent = `评测台 · 工具调用正确率 ${Math.round(suite.summary.toolCallAccuracy * 100)}% · 平均 ${suite.summary.averageSteps.toFixed(1)} 步/任务 · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      addBubble('assistant', `运行出错：${message}`);
+      statusEl.textContent = `出错：${message}`;
+    } finally {
+      running = false;
+      runBtn.disabled = false;
+    }
+    return;
+  }
   // Day 6 · Multi-agent mode: a "多 Agent 协作：<主题>" task is handled
   // by the coordinator (researcher retrieves, writer composes) instead
   // of the single-agent loop.
