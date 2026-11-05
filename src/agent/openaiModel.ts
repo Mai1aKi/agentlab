@@ -26,6 +26,51 @@ interface OpenAiMessage {
   tool_calls?: OpenAiToolCall[];
 }
 
+/** One useful piece of a streaming (SSE) response (Day 8): a fragment
+ *  of text, and/or fragments of tool calls keyed by their `index`. */
+export interface StreamDelta {
+  content?: string;
+  toolCalls?: { index: number; id?: string; name?: string; arguments?: string }[];
+}
+
+/** Parse one SSE line from a streaming chat response. Returns null for
+ *  anything that carries no answer content: blank lines, the `[DONE]`
+ *  sentinel, role-only opening chunks, and malformed JSON. Pure, so the
+ *  streaming protocol can be unit-tested without a network or a body. */
+export function parseStreamLine(line: string): StreamDelta | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('data:')) return null;
+  const payload = trimmed.slice('data:'.length).trim();
+  if (!payload || payload === '[DONE]') return null;
+  let chunk: {
+    choices?: {
+      delta?: {
+        content?: string | null;
+        tool_calls?: {
+          index: number;
+          id?: string;
+          function?: { name?: string; arguments?: string };
+        }[];
+      };
+    }[];
+  };
+  try {
+    chunk = JSON.parse(payload) as typeof chunk;
+  } catch {
+    return null;
+  }
+  const delta = chunk.choices?.[0]?.delta;
+  if (!delta) return null;
+  const toolCalls = (delta.tool_calls ?? []).map((tc) => ({
+    index: tc.index,
+    id: tc.id,
+    name: tc.function?.name,
+    arguments: tc.function?.arguments,
+  }));
+  if (!delta.content && toolCalls.length === 0) return null;
+  return { content: delta.content ?? undefined, toolCalls: toolCalls.length ? toolCalls : undefined };
+}
+
 export class OpenAiCompatibleModel implements ChatModel {
   readonly name: string;
   private readonly baseUrl: string;
@@ -48,9 +93,17 @@ export class OpenAiCompatibleModel implements ChatModel {
     this.retryDelayMs = options.retryDelayMs ?? 900;
   }
 
-  async complete(messages: Message[], tools: ToolSpec[]): Promise<ModelReply> {
+  async complete(
+    messages: Message[],
+    tools: ToolSpec[],
+    onTextDelta?: (delta: string) => void,
+  ): Promise<ModelReply> {
+    // Day 8 · Streaming: only when the caller wants per-word display.
+    // Without a callback the classic one-shot request is unchanged.
+    const streaming = typeof onTextDelta === 'function';
     const requestBody = JSON.stringify({
         model: this.modelId,
+        stream: streaming,
         messages: messages.map(toOpenAiMessage),
         tools: tools.map((t) => ({
           type: 'function',
@@ -107,6 +160,8 @@ export class OpenAiCompatibleModel implements ChatModel {
       throw new Error(`Model API error: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`);
     }
 
+    if (streaming) return this.consumeStream(response, onTextDelta);
+
     const data = (await response.json()) as {
       choices: { message: OpenAiMessage }[];
     };
@@ -130,6 +185,73 @@ export class OpenAiCompatibleModel implements ChatModel {
         : { type: 'toolCalls', calls };
     }
     return { type: 'text', content: message.content ?? '' };
+  }
+
+  /** Day 8 · Read an SSE streaming response: feed each text fragment to
+   *  `onTextDelta` as it arrives, assemble tool-call fragments by index,
+   *  and return the same ModelReply shapes as the one-shot path. Lines
+   *  may be split across network chunks, so parsing is line-buffered;
+   *  a body without a reader falls back to splitting the full text. */
+  private async consumeStream(
+    response: Response,
+    onTextDelta: (delta: string) => void,
+  ): Promise<ModelReply> {
+    let content = '';
+    const callsByIndex = new Map<number, { id: string; name: string; argsText: string }>();
+    const handleLine = (line: string) => {
+      const delta = parseStreamLine(line);
+      if (!delta) return;
+      if (delta.content) {
+        content += delta.content;
+        onTextDelta(delta.content);
+      }
+      for (const tc of delta.toolCalls ?? []) {
+        const slot = callsByIndex.get(tc.index) ?? { id: '', name: '', argsText: '' };
+        if (tc.id) slot.id = tc.id;
+        if (tc.name) slot.name = tc.name;
+        if (tc.arguments) slot.argsText += tc.arguments;
+        callsByIndex.set(tc.index, slot);
+      }
+    };
+
+    const reader = response.body?.getReader?.();
+    if (reader) {
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl = buffer.indexOf('\n');
+        while (nl >= 0) {
+          handleLine(buffer.slice(0, nl));
+          buffer = buffer.slice(nl + 1);
+          nl = buffer.indexOf('\n');
+        }
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) handleLine(buffer);
+    } else {
+      for (const line of (await response.text()).split('\n')) handleLine(line);
+    }
+
+    if (callsByIndex.size > 0) {
+      const calls = [...callsByIndex.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, slot], i) => {
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(slot.argsText || '{}') as Record<string, unknown>;
+          } catch {
+            args = {};
+          }
+          return { id: slot.id || `call_${i + 1}`, name: slot.name, args };
+        });
+      return calls.length === 1
+        ? { type: 'toolCall', call: calls[0] }
+        : { type: 'toolCalls', calls };
+    }
+    return { type: 'text', content };
   }
 }
 

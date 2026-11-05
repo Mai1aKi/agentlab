@@ -119,6 +119,24 @@ describe('agent loop with the mock model', () => {
     expect(result.plan?.every((p) => p.status === 'done')).toBe(true);
   });
 
+  it('forwards text deltas from the model to the run callback (Day 8 streaming)', async () => {
+    const streamingModel: ChatModel = {
+      name: 'stream-stub',
+      async complete(_messages, _tools, onTextDelta) {
+        onTextDelta?.('你');
+        onTextDelta?.('好');
+        return { type: 'text', content: '你好' };
+      },
+    };
+    const deltas: string[] = [];
+    const agent = new Agent(streamingModel, createDefaultRegistry(), {
+      onTextDelta: (d) => deltas.push(d),
+    });
+    const result = await agent.run('hi');
+    expect(deltas).toEqual(['你', '好']);
+    expect(result.finalText).toBe('你好');
+  });
+
   it('answers chit-chat directly without tools', async () => {
     const agent = new Agent(new MockModel(), createDefaultRegistry());
     const result = await agent.run('你好');

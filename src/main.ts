@@ -218,7 +218,22 @@ async function runTask(text: string): Promise<void> {
     return;
   }
   const model = currentModel();
-  const agent = new Agent(model, createDefaultRegistry());
+  // Day 8 · Streaming: BYOK text arrives fragment by fragment — show it
+  // in a live bubble (plain text while streaming), then swap in the
+  // Markdown rendering of the final answer when the run completes.
+  const stream: { el: HTMLDivElement | null; text: string } = { el: null, text: '' };
+  const agent = new Agent(model, createDefaultRegistry(), {
+    onTextDelta: (delta) => {
+      stream.text += delta;
+      if (!stream.el) {
+        stream.el = document.createElement('div');
+        stream.el.className = 'bubble assistant';
+        chatEl.appendChild(stream.el);
+      }
+      stream.el.textContent = stream.text;
+      stream.el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    },
+  });
   const started = performance.now();
   lastTrace = [];
   try {
@@ -226,10 +241,12 @@ async function runTask(text: string): Promise<void> {
       lastTrace.push(event);
       addTrace(event);
     });
-    addBubble('assistant', result.finalText);
+    if (stream.el) stream.el.innerHTML = renderMarkdown(result.finalText);
+    else addBubble('assistant', result.finalText);
     statusEl.textContent = `模型：${model.name} · 步数：${result.steps} · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    stream.el?.remove();
     addBubble('assistant', `运行出错：${message}`);
     statusEl.textContent = `出错：${message}（检查 BYOK 设置或网络）`;
   } finally {

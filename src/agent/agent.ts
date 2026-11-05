@@ -23,6 +23,9 @@ export interface AgentOptions {
   /** Custom folder for the messages being compressed; defaults to the
    *  deterministic extractive summarizer in memory.ts. */
   summarize?: (messages: readonly Message[]) => Message;
+  /** Streaming display (Day 8): forwarded to the model, which reports
+   *  each text fragment as it arrives so the UI can show it per-word. */
+  onTextDelta?: (delta: string) => void;
 }
 
 export interface RunResult {
@@ -48,6 +51,7 @@ export class Agent {
   private readonly maxHistoryMessages: number;
   private readonly keepRecentMessages: number;
   private readonly summarize?: AgentOptions['summarize'];
+  private readonly onTextDelta?: AgentOptions['onTextDelta'];
 
   constructor(
     private readonly model: ChatModel,
@@ -59,6 +63,7 @@ export class Agent {
     this.maxHistoryMessages = options.maxHistoryMessages ?? 24;
     this.keepRecentMessages = options.keepRecentMessages ?? 10;
     this.summarize = options.summarize;
+    this.onTextDelta = options.onTextDelta;
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
 
@@ -104,7 +109,11 @@ export class Agent {
 
     for (let step = 1; step <= this.maxSteps; step++) {
       this.maybeCompress(emit);
-      const reply = await this.model.complete(this.messages, this.registry.listSpecs());
+      const reply = await this.model.complete(
+        this.messages,
+        this.registry.listSpecs(),
+        this.onTextDelta,
+      );
       emit({ type: 'modelReply', step, reply });
 
       if (reply.type === 'plan') {

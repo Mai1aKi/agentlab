@@ -1,5 +1,15 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 8 — 2026-11-04
+
+流式输出：BYOK 模式下接入 streaming，回答逐字显示。
+
+- 模型层（`src/agent/types.ts`）：`ChatModel.complete` 新增可选的 `onTextDelta` 回调——模型支持流式时逐片报告文本，返回的 `ModelReply` 形状不变，不带回调的模型与调用方完全不受影响
+- BYOK 流式（`src/agent/openaiModel.ts`）：带回调时请求加 `stream: true`，按 SSE 逐行解析响应体（行缓冲，网络分片切断一行也能拼回）；纯函数 `parseStreamLine` 提取文本片段与工具调用片段，`[DONE]` / 角色开场块 / 坏 JSON 一律忽略；`consumeStream` 把文本片段即时喂给回调、工具调用参数按 index 分片拼装，最终仍返回原有的 text / toolCall / toolCalls 三种回复；无回调时走原一次性请求（`stream: false`），429/503 重试与错误原文透出不变
+- 运行时（`src/agent/agent.ts`）：`AgentOptions.onTextDelta` 透传给模型，运行时本身不感知分片细节
+- 控制台（`src/main.ts`）：流式片段先进一个纯文本气泡逐字增长，运行结束后换成最终回答的 Markdown 渲染；出错时移除残缺气泡再报错误；MockModel 不发片段，演示模式行为不变
+- 单元测试新增 5 个（共 88 个）：SSE 行解析（文本 / 工具片段 / 噪声忽略）、跨网络分片的逐字回调与拼合回复、流式工具调用参数按 index 拼装、无回调时不带 stream 标记、Agent 把模型片段透传给运行回调
+
 ## Day 7 — 2026-11-03
 
 评测台：内置任务集一键跑批，统计工具调用正确率与步数。

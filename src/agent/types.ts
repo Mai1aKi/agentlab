@@ -42,10 +42,17 @@ export interface ToolSpec {
 }
 
 /** Anything that can play the "brain" role: the built-in mock model,
- *  an OpenAI-compatible API, or a test stub. */
+ *  an OpenAI-compatible API, or a test stub. When `onTextDelta` is
+ *  given, a model that supports streaming (Day 8) reports each piece
+ *  of its text answer as it arrives, so the UI can show it per-word
+ *  instead of all at once; the returned reply is unchanged. */
 export interface ChatModel {
   readonly name: string;
-  complete(messages: Message[], tools: ToolSpec[]): Promise<ModelReply>;
+  complete(
+    messages: Message[],
+    tools: ToolSpec[],
+    onTextDelta?: (delta: string) => void,
+  ): Promise<ModelReply>;
 }
 
 /** One entry in the run trace — the same events the UI visualizes. */

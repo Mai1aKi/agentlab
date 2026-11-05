@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OpenAiCompatibleModel } from '../src/agent/openaiModel';
+import { OpenAiCompatibleModel, parseStreamLine } from '../src/agent/openaiModel';
 import type { Message, ToolSpec } from '../src/agent/types';
 
 const TOOLS: ToolSpec[] = [
@@ -232,5 +232,139 @@ describe('OpenAiCompatibleModel', () => {
     await expect(model.complete([{ role: 'user', content: 'hi' }], TOOLS)).rejects.toThrowError(
       /HTTP 401/,
     );
+  });
+});
+
+describe('streaming (Day 8)', () => {
+  /** A fetch stub whose response body streams the given text chunks —
+   *  chunk boundaries deliberately need not align with SSE lines. */
+  function sseFetch(chunks: string[], capture?: (init: { body: string }) => void): typeof fetch {
+    return (async (_url: unknown, init: { body: string }) => {
+      capture?.(init);
+      const encoder = new TextEncoder();
+      let i = 0;
+      return {
+        ok: true,
+        status: 200,
+        body: {
+          getReader: () => ({
+            read: async () =>
+              i < chunks.length
+                ? { done: false, value: encoder.encode(chunks[i++]) }
+                : { done: true, value: undefined },
+          }),
+        },
+        json: async () => ({}),
+        text: async () => '',
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+  }
+
+  const sse = (obj: unknown) => `data: ${JSON.stringify(obj)}\n`;
+
+  it('parseStreamLine extracts content and tool-call fragments, ignores noise', () => {
+    expect(parseStreamLine(sse({ choices: [{ delta: { content: '你' } }] }))).toEqual({
+      content: '你',
+    });
+    expect(
+      parseStreamLine(
+        sse({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: 'c1', function: { name: 'clock', arguments: '{' } },
+                ],
+              },
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ toolCalls: [{ index: 0, id: 'c1', name: 'clock', arguments: '{' }] });
+    expect(parseStreamLine('data: [DONE]')).toBeNull();
+    expect(parseStreamLine('')).toBeNull();
+    expect(parseStreamLine(sse({ choices: [{ delta: { role: 'assistant' } }] }))).toBeNull();
+    expect(parseStreamLine('data: {oops')).toBeNull();
+  });
+
+  it('streams text per-word: deltas fire in order and the reply is the joined text', async () => {
+    let sentBody: Record<string, unknown> | null = null;
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: sseFetch(
+        [
+          // first line split across two network chunks
+          sse({ choices: [{ delta: { role: 'assistant' } }] }) +
+            sse({ choices: [{ delta: { content: '你好' } }] }).slice(0, 20),
+          sse({ choices: [{ delta: { content: '你好' } }] }).slice(20) +
+            sse({ choices: [{ delta: { content: '，世界' } }] }),
+          'data: [DONE]\n',
+        ],
+        (init) => {
+          sentBody = JSON.parse(init.body) as Record<string, unknown>;
+        },
+      ),
+    });
+    const deltas: string[] = [];
+    const reply = await model.complete([{ role: 'user', content: 'hi' }], TOOLS, (d) =>
+      deltas.push(d),
+    );
+    expect(deltas).toEqual(['你好', '，世界']);
+    expect(reply).toEqual({ type: 'text', content: '你好，世界' });
+    expect((sentBody as unknown as { stream: boolean }).stream).toBe(true);
+  });
+
+  it('assembles streamed tool-call argument fragments by index', async () => {
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: sseFetch([
+        sse({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: 'call_7', function: { name: 'calculator', arguments: '{"expr' } },
+                ],
+              },
+            },
+          ],
+        }),
+        sse({
+          choices: [
+            { delta: { tool_calls: [{ index: 0, function: { arguments: 'ession":"2+2"}' } }] } },
+          ],
+        }),
+        'data: [DONE]\n',
+      ]),
+    });
+    const reply = await model.complete([{ role: 'user', content: '计算 2+2' }], TOOLS, () => {});
+    expect(reply).toEqual({
+      type: 'toolCall',
+      call: { id: 'call_7', name: 'calculator', args: { expression: '2+2' } },
+    });
+  });
+
+  it('without a delta callback it stays one-shot (no stream flag)', async () => {
+    let sentBody: Record<string, unknown> | null = null;
+    const capturingFetch = (async (_url: unknown, init: { body: string }) => {
+      sentBody = JSON.parse(init.body) as Record<string, unknown>;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { role: 'assistant', content: 'ok' } }] }),
+      } as Response;
+    }) as unknown as typeof fetch;
+    const model = new OpenAiCompatibleModel({
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'sk-test',
+      model: 'demo',
+      fetchFn: capturingFetch,
+    });
+    await model.complete([{ role: 'user', content: 'hi' }], TOOLS);
+    expect((sentBody as unknown as { stream: boolean }).stream).toBe(false);
   });
 });
