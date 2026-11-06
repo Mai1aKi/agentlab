@@ -11,6 +11,7 @@
 import { compressHistory } from './memory';
 import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
 import { ToolRegistry } from './tools';
+import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
 import type { ChatModel, Message, TraceEvent } from './types';
 
 export interface AgentOptions {
@@ -26,6 +27,10 @@ export interface AgentOptions {
   /** Streaming display (Day 8): forwarded to the model, which reports
    *  each text fragment as it arrives so the UI can show it per-word. */
   onTextDelta?: (delta: string) => void;
+  /** Tool-result truncation (Day 9): results longer than this many
+   *  characters are cut (with a marker) before being fed back to the
+   *  model, so one huge tool output cannot blow up the context. */
+  maxToolResultChars?: number;
 }
 
 export interface RunResult {
@@ -52,6 +57,7 @@ export class Agent {
   private readonly keepRecentMessages: number;
   private readonly summarize?: AgentOptions['summarize'];
   private readonly onTextDelta?: AgentOptions['onTextDelta'];
+  private readonly maxToolResultChars: number;
 
   constructor(
     private readonly model: ChatModel,
@@ -64,6 +70,7 @@ export class Agent {
     this.keepRecentMessages = options.keepRecentMessages ?? 10;
     this.summarize = options.summarize;
     this.onTextDelta = options.onTextDelta;
+    this.maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
 
@@ -145,16 +152,19 @@ export class Agent {
       });
       for (const call of calls) {
         const outcome = await this.registry.execute(call);
+        // Day 9: cap what is fed back (and traced) — an over-long result
+        // is truncated with a marker naming the omitted character count.
+        const fedBack = truncateToolResult(outcome.result, this.maxToolResultChars).text;
         this.messages.push({
           role: 'tool',
-          content: outcome.result,
+          content: fedBack,
           toolCallId: call.id,
           toolName: call.name,
         });
         emit({
           type: 'toolResult',
           call,
-          result: outcome.result,
+          result: fedBack,
           isError: outcome.isError,
         });
         // Tick off the next plan step now that this call has finished.
