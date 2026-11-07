@@ -10,9 +10,10 @@
 
 import { compressHistory } from './memory';
 import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
+import { computeRunStats } from './stats';
 import { ToolRegistry } from './tools';
 import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
-import type { ChatModel, Message, TraceEvent } from './types';
+import type { ChatModel, Message, RunStats, TraceEvent } from './types';
 
 export interface AgentOptions {
   maxSteps?: number;
@@ -31,6 +32,9 @@ export interface AgentOptions {
    *  characters are cut (with a marker) before being fed back to the
    *  model, so one huge tool output cannot blow up the context. */
   maxToolResultChars?: number;
+  /** Clock for run-cost timing (Day 10); injectable so tests can pin
+   *  the measured duration. Defaults to `performance.now`. */
+  now?: () => number;
 }
 
 export interface RunResult {
@@ -40,6 +44,9 @@ export interface RunResult {
   /** The plan for this run, if the model produced one (Day 3). Items are
    *  ticked off as their tool calls finish; unfinished items stay pending. */
   plan?: PlanItem[];
+  /** Run-cost statistics (Day 10): steps, tool calls and duration,
+   *  also emitted as a `runStats` trace event before final/stopped. */
+  stats: RunStats;
 }
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -58,6 +65,7 @@ export class Agent {
   private readonly summarize?: AgentOptions['summarize'];
   private readonly onTextDelta?: AgentOptions['onTextDelta'];
   private readonly maxToolResultChars: number;
+  private readonly now: () => number;
 
   constructor(
     private readonly model: ChatModel,
@@ -71,6 +79,7 @@ export class Agent {
     this.summarize = options.summarize;
     this.onTextDelta = options.onTextDelta;
     this.maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
+    this.now = options.now ?? (() => performance.now());
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
 
@@ -105,6 +114,11 @@ export class Agent {
       trace.push(event);
       onEvent?.(event);
     };
+    // Day 10 · Run-cost statistics: time the whole run; the stats are
+    // derived from the trace itself just before the run ends and are
+    // emitted as a runStats event the trace panel can show.
+    const startedAt = this.now();
+    const buildStats = (): RunStats => computeRunStats(trace, this.now() - startedAt);
 
     this.messages.push({ role: 'user', content: userText });
     emit({ type: 'user', content: userText });
@@ -136,8 +150,10 @@ export class Agent {
 
       if (reply.type === 'text') {
         this.messages.push({ role: 'assistant', content: reply.content });
+        const stats = buildStats();
+        emit({ type: 'runStats', stats });
         emit({ type: 'final', content: reply.content });
-        return { finalText: reply.content, trace, steps: step, plan };
+        return { finalText: reply.content, trace, steps: step, plan, stats };
       }
 
       // Tool call(s): one turn may carry several calls. Record them as a
@@ -179,7 +195,9 @@ export class Agent {
     }
 
     const reason = `达到最大步数 ${this.maxSteps}，已停止。`;
+    const stats = buildStats();
+    emit({ type: 'runStats', stats });
     emit({ type: 'stopped', reason });
-    return { finalText: reason, trace, steps: this.maxSteps, plan };
+    return { finalText: reason, trace, steps: this.maxSteps, plan, stats };
   }
 }

@@ -6,6 +6,7 @@ import { formatEvalReport, runEvalSuite } from './agent/eval';
 import { MockModel } from './agent/mockModel';
 import { runMultiAgent } from './agent/multiAgent';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
+import { formatRunStats } from './agent/stats';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
@@ -143,6 +144,9 @@ function addTrace(event: TraceEvent): void {
       div.innerHTML =
         `<span class="t-tag tool">记忆压缩</span> 早期 ${event.summarizedCount} 条已摘要，保留最近 ${event.keptCount} 条` +
         `<pre>${escapeHtml(event.summary)}</pre>`;
+      break;
+    case 'runStats':
+      div.innerHTML = `<span class="t-tag tool">运行成本</span> ${escapeHtml(formatRunStats(event.stats))}`;
       break;
     case 'final':
       div.innerHTML = `<span class="t-tag final">完成</span> 已生成最终回答`;

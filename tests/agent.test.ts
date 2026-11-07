@@ -10,7 +10,7 @@ describe('agent loop with the mock model', () => {
     const result = await agent.run('计算 (18 + 26) * 3 - 7');
     expect(result.finalText).toContain('125');
     const kinds = result.trace.map((e) => e.type);
-    expect(kinds).toEqual(['user', 'modelReply', 'toolResult', 'modelReply', 'final']);
+    expect(kinds).toEqual(['user', 'modelReply', 'toolResult', 'modelReply', 'runStats', 'final']);
     const toolEvent = result.trace.find((e) => e.type === 'toolResult');
     expect(toolEvent).toMatchObject({ isError: false, result: '125' });
   });
@@ -51,7 +51,7 @@ describe('agent loop with the mock model', () => {
     expect(result.finalText).toBe('done');
     expect(result.steps).toBe(2);
     const kinds = result.trace.map((e) => e.type);
-    expect(kinds).toEqual(['user', 'modelReply', 'toolResult', 'toolResult', 'modelReply', 'final']);
+    expect(kinds).toEqual(['user', 'modelReply', 'toolResult', 'toolResult', 'modelReply', 'runStats', 'final']);
     const toolEvents = result.trace.filter((e) => e.type === 'toolResult');
     expect(toolEvents.map((e) => (e.type === 'toolResult' ? e.call.id : ''))).toEqual(['a', 'b']);
     expect(toolEvents[0]).toMatchObject({ result: '5', isError: false });
@@ -104,6 +104,7 @@ describe('agent loop with the mock model', () => {
       'toolResult',
       'planStepDone',
       'modelReply',
+      'runStats',
       'final',
     ]);
     expect(result.plan?.map((p) => p.status)).toEqual(['done', 'done']);

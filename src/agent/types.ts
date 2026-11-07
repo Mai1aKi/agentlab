@@ -55,6 +55,15 @@ export interface ChatModel {
   ): Promise<ModelReply>;
 }
 
+/** Cost of one run (Day 10): model steps taken, tool calls made (and
+ *  how many failed), and wall-clock duration in milliseconds. */
+export interface RunStats {
+  steps: number;
+  toolCalls: number;
+  toolErrors: number;
+  durationMs: number;
+}
+
 /** One entry in the run trace — the same events the UI visualizes. */
 export type TraceEvent =
   | { type: 'user'; content: string }
@@ -65,5 +74,6 @@ export type TraceEvent =
   | { type: 'planStepDone'; index: number; title: string }
   | { type: 'subAgentStarted'; role: 'researcher' | 'writer'; instruction: string }
   | { type: 'subAgentDone'; role: 'researcher' | 'writer'; summary: string }
+  | { type: 'runStats'; stats: RunStats }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

@@ -1,5 +1,15 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 10 — 2026-11-06
+
+运行成本统计：统计每轮的步数耗时与工具调用次数，轨迹面板可见。
+
+- 统计模块（`src/agent/stats.ts`）：纯函数 `computeRunStats` 从轨迹本身推导成本——步数取模型回复的最大步号，工具调用与失败次数数 `toolResult` 事件，耗时由运行时传入并做消毒（负数 / 非有限值归零、小数向下取整，坏时钟不会产出离谱数字）；`formatRunStats` 渲染成一行「步数 · 工具调用 · 失败 · 耗时」
+- 类型层（`src/agent/types.ts`）：新增 `RunStats` 与 `runStats` 轨迹事件；轨迹导出 / 回放白名单（`src/agent/trace.ts`）同步放行，导出的轨迹回放时成本行不丢
+- 运行时（`src/agent/agent.ts`）：新增可注入时钟选项 `now`（默认 `performance.now`，测试可钉住耗时）；运行结束（final 与熔断 stopped 两条出口）前先算统计、发 `runStats` 事件，`RunResult.stats` 同步返回同一份数字
+- 控制台（`src/main.ts`）：轨迹面板新增「运行成本」一行，展示步数、工具调用次数（含失败数）与耗时毫秒
+- 单元测试新增 5 个（共 99 个）：轨迹推导步数/调用/失败、空轨迹与坏耗时归零、一行格式化、注入时钟下 Agent 返回统计且 `runStats` 在 final 之前、熔断停止时统计仍在 stopped 之前；既有 3 处轨迹顺序断言同步加入 `runStats`
+
 ## Day 9 — 2026-11-05
 
 工具结果截断：超长工具输出自动截断并标注，避免撑爆上下文。
