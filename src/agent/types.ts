@@ -69,6 +69,7 @@ export type TraceEvent =
   | { type: 'user'; content: string }
   | { type: 'modelReply'; step: number; reply: ModelReply }
   | { type: 'toolResult'; call: ToolCall; result: string; isError: boolean }
+  | { type: 'toolRetry'; call: ToolCall; attempt: number; result: string }
   | { type: 'memoryCompressed'; summarizedCount: number; keptCount: number; summary: string }
   | { type: 'planCreated'; steps: string[] }
   | { type: 'planStepDone'; index: number; title: string }

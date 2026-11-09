@@ -17,6 +17,7 @@ const EVENT_TYPES = new Set([
   'user',
   'modelReply',
   'toolResult',
+  'toolRetry',
   'memoryCompressed',
   'planCreated',
   'planStepDone',

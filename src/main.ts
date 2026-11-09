@@ -126,6 +126,11 @@ function addTrace(event: TraceEvent): void {
         `<span class="t-tag ${event.isError ? 'error' : 'tool'}">工具结果</span> ` +
         `<code>${escapeHtml(event.call.name)}</code><pre>${escapeHtml(event.result)}</pre>`;
       break;
+    case 'toolRetry':
+      div.innerHTML =
+        `<span class="t-tag error">工具重试</span> ` +
+        `<code>${escapeHtml(event.call.name)}</code> 第 ${event.attempt} 次重试（上次失败：${escapeHtml(event.result)}）`;
+      break;
     case 'planCreated':
       div.innerHTML =
         `<span class="t-tag tool">计划</span> 共 ${event.steps.length} 步，开始逐步执行` +

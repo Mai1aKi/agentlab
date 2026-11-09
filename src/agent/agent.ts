@@ -10,6 +10,7 @@
 
 import { compressHistory } from './memory';
 import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
+import { resolveMaxToolRetries } from './retry';
 import { computeRunStats } from './stats';
 import { ToolRegistry } from './tools';
 import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
@@ -32,6 +33,9 @@ export interface AgentOptions {
    *  characters are cut (with a marker) before being fed back to the
    *  model, so one huge tool output cannot blow up the context. */
   maxToolResultChars?: number;
+  /** Tool-failure retry (Day 11): how many times a failed tool call is
+   *  retried before its error is fed back. Defaults to 1; 0 disables. */
+  maxToolRetries?: number;
   /** Clock for run-cost timing (Day 10); injectable so tests can pin
    *  the measured duration. Defaults to `performance.now`. */
   now?: () => number;
@@ -65,6 +69,7 @@ export class Agent {
   private readonly summarize?: AgentOptions['summarize'];
   private readonly onTextDelta?: AgentOptions['onTextDelta'];
   private readonly maxToolResultChars: number;
+  private readonly maxToolRetries: number;
   private readonly now: () => number;
 
   constructor(
@@ -79,6 +84,7 @@ export class Agent {
     this.summarize = options.summarize;
     this.onTextDelta = options.onTextDelta;
     this.maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
+    this.maxToolRetries = resolveMaxToolRetries(options.maxToolRetries);
     this.now = options.now ?? (() => performance.now());
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
@@ -167,7 +173,14 @@ export class Agent {
         toolCalls: calls,
       });
       for (const call of calls) {
-        const outcome = await this.registry.execute(call);
+        // Day 11: a failed call is retried (once by default) before
+        // anything is fed back; each retry is marked in the trace and
+        // only the final outcome becomes the tool result.
+        let outcome = await this.registry.execute(call);
+        for (let attempt = 1; outcome.isError && attempt <= this.maxToolRetries; attempt++) {
+          emit({ type: 'toolRetry', call, attempt, result: outcome.result });
+          outcome = await this.registry.execute(call);
+        }
         // Day 9: cap what is fed back (and traced) — an over-long result
         // is truncated with a marker naming the omitted character count.
         const fedBack = truncateToolResult(outcome.result, this.maxToolResultChars).text;
