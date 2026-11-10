@@ -2,6 +2,10 @@
 
 import { Agent } from './agent/agent';
 import { createDefaultRegistry } from './agent/builtinTools';
+import {
+  formatConversationMarkdown,
+  type ConversationMessage,
+} from './agent/conversationExport';
 import { formatEvalReport, runEvalSuite } from './agent/eval';
 import { MockModel } from './agent/mockModel';
 import { runMultiAgent } from './agent/multiAgent';
@@ -41,11 +45,18 @@ const inputEl = document.getElementById('task-input') as HTMLInputElement;
 const runBtn = document.getElementById('run-btn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLDivElement;
 const exportTraceBtn = document.getElementById('export-trace-btn') as HTMLButtonElement;
+const exportConversationBtn = document.getElementById(
+  'export-conversation-btn',
+) as HTMLButtonElement;
 const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButtonElement;
 const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
 
 /** The most recent run's trace, for export (Day 5). */
 let lastTrace: TraceEvent[] = [];
+
+/** Every visible bubble this session, in order, for the Markdown
+ *  conversation export (Day 12). */
+const chatLog: ConversationMessage[] = [];
 
 // Restore BYOK settings (key stays in this browser's localStorage only).
 try {
@@ -83,6 +94,7 @@ modelKindEl.addEventListener('change', () => {
 });
 
 function addBubble(role: 'user' | 'assistant', text: string): void {
+  chatLog.push({ role, text });
   const div = document.createElement('div');
   div.className = `bubble ${role}`;
   // Assistant replies are Markdown (real models answer in it); the
@@ -250,8 +262,12 @@ async function runTask(text: string): Promise<void> {
       lastTrace.push(event);
       addTrace(event);
     });
-    if (stream.el) stream.el.innerHTML = renderMarkdown(result.finalText);
-    else addBubble('assistant', result.finalText);
+    if (stream.el) {
+      // The streamed bubble never went through addBubble, so record
+      // its final text in the chat log here (Day 12).
+      chatLog.push({ role: 'assistant', text: result.finalText });
+      stream.el.innerHTML = renderMarkdown(result.finalText);
+    } else addBubble('assistant', result.finalText);
     statusEl.textContent = `模型：${model.name} · 步数：${result.steps} · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -277,6 +293,23 @@ exportTraceBtn.addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
   statusEl.textContent = `已导出轨迹：${lastTrace.length} 个事件`;
+});
+
+exportConversationBtn.addEventListener('click', () => {
+  if (chatLog.length === 0 && lastTrace.length === 0) {
+    statusEl.textContent = '暂无可导出的对话，先运行一次任务。';
+    return;
+  }
+  const blob = new Blob([formatConversationMarkdown(chatLog, lastTrace)], {
+    type: 'text/markdown',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'agentlab-conversation.md';
+  a.click();
+  URL.revokeObjectURL(url);
+  statusEl.textContent = `已导出对话 Markdown：${chatLog.length} 条消息 · ${lastTrace.length} 个轨迹事件`;
 });
 
 importTraceBtn.addEventListener('click', () => importTraceFile.click());
