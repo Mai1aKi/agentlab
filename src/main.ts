@@ -50,6 +50,8 @@ const exportConversationBtn = document.getElementById(
 ) as HTMLButtonElement;
 const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButtonElement;
 const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
+const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
+const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanElement;
 
 /** The most recent run's trace, for export (Day 5). */
 let lastTrace: TraceEvent[] = [];
@@ -89,9 +91,35 @@ function currentModel(): ChatModel {
   return new MockModel();
 }
 
+/** Top-bar model status: a glanceable readiness signal next to the
+ *  model picker — demo, BYOK ready, or BYOK incomplete (and why). */
+function syncModelStatus(): void {
+  if (modelKindEl.value !== 'byok') {
+    modelStatusEl.dataset.state = 'mock';
+    modelStatusEl.textContent = '演示模型 · 零成本';
+    return;
+  }
+  const missing: string[] = [];
+  if (!baseUrlEl.value.trim()) missing.push('地址');
+  if (!modelNameEl.value.trim()) missing.push('模型名');
+  if (!apiKeyEl.value.trim()) missing.push('Key');
+  if (missing.length === 0) {
+    modelStatusEl.dataset.state = 'ready';
+    modelStatusEl.textContent = `BYOK · ${modelNameEl.value.trim()}`;
+  } else {
+    modelStatusEl.dataset.state = 'warn';
+    modelStatusEl.textContent = `BYOK · 未填${missing.join('/')}`;
+  }
+}
+
 modelKindEl.addEventListener('change', () => {
   byokFields.hidden = modelKindEl.value !== 'byok';
+  syncModelStatus();
 });
+for (const el of [baseUrlEl, modelNameEl, apiKeyEl]) {
+  el.addEventListener('input', syncModelStatus);
+}
+syncModelStatus();
 
 function addBubble(role: 'user' | 'assistant', text: string): void {
   chatLog.push({ role, text });
@@ -111,6 +139,7 @@ function addTrace(event: TraceEvent): void {
   div.className = 'trace-item';
   switch (event.type) {
     case 'user':
+      traceSummaryEl.textContent = '';
       div.innerHTML = `<span class="t-tag user">任务</span> ${escapeHtml(event.content)}`;
       break;
     case 'modelReply':
@@ -163,8 +192,10 @@ function addTrace(event: TraceEvent): void {
         `<pre>${escapeHtml(event.summary)}</pre>`;
       break;
     case 'runStats':
-      div.innerHTML = `<span class="t-tag tool">运行成本</span> ${escapeHtml(formatRunStats(event.stats))}`;
-      break;
+      // Run cost lives in the trace header summary, not as another
+      // card competing with the steps (UI polish v5).
+      traceSummaryEl.textContent = formatRunStats(event.stats);
+      return;
     case 'final':
       div.innerHTML = `<span class="t-tag final">完成</span> 已生成最终回答`;
       break;

@@ -3,7 +3,11 @@
    workspace — conversation column with a docked composer, and a
    full-height trace inspector on the right. Panels scroll
    internally; the page itself does not. Same restrained neutral
-   palette as v3: hairlines, whitespace, signal-dot colors only. */
+   palette as v3: hairlines, whitespace, signal-dot colors only.
+   v5 polish (2026-11-09): no clipped controls (wrapping trace
+   actions, fading sample row), a centered reading column, a
+   compact trace with run cost as a header summary instead of a
+   card, and a model-readiness status in the top bar. */
 
 :root {
   --bg: #0a0a0b;
@@ -79,7 +83,22 @@ body {
 .brand-sub { font-size: 0.83rem; font-weight: 400; color: var(--ink-faint); }
 .topbar-controls { display: flex; align-items: center; gap: 14px; }
 .model-select { display: flex; align-items: center; gap: 9px; }
+.model-select select { max-width: 272px; text-overflow: ellipsis; }
 .control-label { font-size: 0.84rem; color: var(--ink-dim); font-weight: 550; }
+.model-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-status::before { content: ""; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); }
+.model-status[data-state="ready"]::before { background: var(--dot-tool); }
+.model-status[data-state="warn"]::before { background: #f59e0b; }
 .gh-link {
   color: var(--ink-dim);
   text-decoration: none;
@@ -147,6 +166,10 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
   scrollbar-width: none;
 }
 .toolbar::-webkit-scrollbar { display: none; }
+.chat-panel > .toolbar {
+  mask-image: linear-gradient(to right, #000 93%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 93%, transparent 100%);
+}
 .toolbar-label { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-faint); white-space: nowrap; }
 .samples { display: flex; gap: 8px; }
 .chip {
@@ -171,6 +194,9 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
   flex-direction: column;
   gap: 14px;
   padding: 26px 24px;
+  /* center the conversation into a reading column instead of
+     letting bubbles drift across the full panel width */
+  padding-inline: max(24px, calc((100% - var(--col)) / 2));
   scrollbar-width: thin;
   scrollbar-color: #26262b transparent;
 }
@@ -276,7 +302,7 @@ button.primary {
 }
 button.primary:hover:not(:disabled) { background: #fff; }
 button.primary:disabled { opacity: 0.5; cursor: wait; }
-.status { margin-top: 10px; min-height: 1.1em; color: var(--ink-faint); font-size: 0.82rem; font-family: var(--mono); letter-spacing: -0.01em; }
+.status { margin-top: 10px; min-height: 1.1em; color: var(--ink-faint); font-size: 0.82rem; font-family: var(--mono); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hint { margin: 4px 0 2px; color: #43434b; font-size: 0.78rem; line-height: 1.6; }
 
 /* ----- trace inspector ----- */
@@ -288,25 +314,41 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
   border-left: 1px solid var(--line);
   background: var(--inset);
 }
-.trace-panel h2 {
+.trace-head {
   flex: 0 0 auto;
-  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
   padding: 15px 20px 13px;
+  border-bottom: 1px solid var(--line);
+}
+.trace-panel h2 {
+  margin: 0;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--ink-faint);
   letter-spacing: 0.16em;
-  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
 }
+.trace-summary {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-dim);
+  text-align: right;
+  line-height: 1.5;
+}
+.trace-actions { flex-wrap: wrap; overflow: visible; padding: 10px 16px; gap: 8px; }
+.chip-sm { font-size: 0.78rem; padding: 5px 11px; }
 .trace {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   position: relative;
-  padding: 16px 18px 18px 30px;
+  padding: 14px 16px 16px 28px;
   scrollbar-width: thin;
   scrollbar-color: #26262b transparent;
 }
@@ -323,10 +365,10 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
   position: relative;
   border: 1px solid var(--line);
   background: var(--panel-2);
-  border-radius: 11px;
-  padding: 10px 13px;
-  font-size: 0.86rem;
-  line-height: 1.6;
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 0.84rem;
+  line-height: 1.55;
   animation: rise 0.22s ease both;
 }
 .trace-item::before {
@@ -340,16 +382,20 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
   background: var(--ink-faint);
 }
 .trace-item pre {
-  margin: 8px 0 1px;
+  margin: 7px 0 1px;
   font-family: var(--mono);
-  font-size: 0.79rem;
+  font-size: 0.78rem;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--ink-dim);
   background: var(--inset);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
+  max-height: 132px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #26262b transparent;
 }
 .trace-item code { font-family: var(--mono); color: var(--ink); font-size: 0.85em; }
 
@@ -382,6 +428,7 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
   body { height: auto; overflow: visible; }
   .brand-sub { display: none; }
   .control-label { display: none; }
+  .model-status { display: none; }
   .workspace { grid-template-columns: 1fr; }
   .chat { overflow: visible; }
   .trace-panel { border-left: none; border-top: 1px solid var(--line); }

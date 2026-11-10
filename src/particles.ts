@@ -27,7 +27,7 @@ export function createParticles(
     vx: (rand() - 0.5) * 0.22,
     vy: (rand() - 0.5) * 0.22,
     r: 0.6 + rand() * 1.1,
-    a: 0.1 + rand() * 0.24,
+    a: 0.08 + rand() * 0.2,
   }));
 }
 
@@ -59,7 +59,7 @@ export function initParticles(canvas: HTMLCanvasElement): void {
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const count = Math.min(90, Math.max(24, Math.floor((w * h) / 24000)));
+    const count = Math.min(72, Math.max(18, Math.floor((w * h) / 32000)));
     particles = createParticles(count, w, h);
   };
   resize();
@@ -75,7 +75,7 @@ export function initParticles(canvas: HTMLCanvasElement): void {
         const dy = a.y - b.y;
         const d2 = dx * dx + dy * dy;
         if (d2 < LINK_DISTANCE * LINK_DISTANCE) {
-          const alpha = (1 - Math.sqrt(d2) / LINK_DISTANCE) * 0.05;
+          const alpha = (1 - Math.sqrt(d2) / LINK_DISTANCE) * 0.04;
           ctx.strokeStyle = `rgba(205, 205, 220, ${alpha.toFixed(3)})`;
           ctx.lineWidth = 1;
           ctx.beginPath();

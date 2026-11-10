@@ -19,6 +19,7 @@
           <option value="byok">自定义 API（BYOK，OpenAI 兼容）</option>
         </select>
       </label>
+      <span id="model-status" class="model-status" data-state="mock">演示模型 · 零成本</span>
       <a class="gh-link" href="https://github.com/Mai1aKi/agentlab" target="_blank" rel="noreferrer">GitHub 仓库</a>
     </div>
   </header>
@@ -49,11 +50,14 @@
     </section>
 
     <aside class="trace-panel">
-      <h2>运行轨迹</h2>
-      <div class="toolbar">
-        <button id="export-trace-btn" type="button" class="chip">导出轨迹 JSON</button>
-        <button id="export-conversation-btn" type="button" class="chip">导出对话 Markdown</button>
-        <button id="import-trace-btn" type="button" class="chip">导入并回放</button>
+      <div class="trace-head">
+        <h2>运行轨迹</h2>
+        <span id="trace-summary" class="trace-summary"></span>
+      </div>
+      <div class="toolbar trace-actions">
+        <button id="export-trace-btn" type="button" class="chip chip-sm">导出轨迹 JSON</button>
+        <button id="export-conversation-btn" type="button" class="chip chip-sm">导出对话 Markdown</button>
+        <button id="import-trace-btn" type="button" class="chip chip-sm">导入并回放</button>
         <input id="import-trace-file" type="file" accept="application/json,.json" hidden>
       </div>
       <div id="trace" class="trace"></div>

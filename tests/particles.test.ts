@@ -11,8 +11,8 @@ describe('particles', () => {
       expect(Math.abs(p.vx)).toBeLessThanOrEqual(0.11);
       expect(Math.abs(p.vy)).toBeLessThanOrEqual(0.11);
       expect(p.r).toBeGreaterThanOrEqual(0.6);
-      expect(p.a).toBeGreaterThanOrEqual(0.1);
-      expect(p.a).toBeLessThanOrEqual(0.34);
+      expect(p.a).toBeGreaterThanOrEqual(0.08);
+      expect(p.a).toBeLessThanOrEqual(0.28);
     }
   });
 
