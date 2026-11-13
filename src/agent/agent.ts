@@ -9,6 +9,7 @@
 // it is what the UI visualizes and what tests assert against.
 
 import { compressHistory } from './memory';
+import { disabledToolResult, isToolDisabled, normalizeDisabledTools } from './permissions';
 import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
 import { resolveMaxToolRetries } from './retry';
 import { computeRunStats } from './stats';
@@ -36,6 +37,11 @@ export interface AgentOptions {
   /** Tool-failure retry (Day 11): how many times a failed tool call is
    *  retried before its error is fed back. Defaults to 1; 0 disables. */
   maxToolRetries?: number;
+  /** Tool permissions (Day 13): names of tools the user disabled in
+   *  the console. A call to a disabled tool is skipped — never
+   *  executed, never retried — and the reason is fed back to the
+   *  model as an error result. */
+  disabledTools?: Iterable<string>;
   /** Clock for run-cost timing (Day 10); injectable so tests can pin
    *  the measured duration. Defaults to `performance.now`. */
   now?: () => number;
@@ -70,6 +76,7 @@ export class Agent {
   private readonly onTextDelta?: AgentOptions['onTextDelta'];
   private readonly maxToolResultChars: number;
   private readonly maxToolRetries: number;
+  private readonly disabledTools: ReadonlySet<string>;
   private readonly now: () => number;
 
   constructor(
@@ -85,6 +92,7 @@ export class Agent {
     this.onTextDelta = options.onTextDelta;
     this.maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
     this.maxToolRetries = resolveMaxToolRetries(options.maxToolRetries);
+    this.disabledTools = normalizeDisabledTools(options.disabledTools);
     this.now = options.now ?? (() => performance.now());
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
@@ -173,13 +181,23 @@ export class Agent {
         toolCalls: calls,
       });
       for (const call of calls) {
-        // Day 11: a failed call is retried (once by default) before
-        // anything is fed back; each retry is marked in the trace and
-        // only the final outcome becomes the tool result.
-        let outcome = await this.registry.execute(call);
-        for (let attempt = 1; outcome.isError && attempt <= this.maxToolRetries; attempt++) {
-          emit({ type: 'toolRetry', call, attempt, result: outcome.result });
+        // Day 13: a disabled tool is skipped entirely — never executed
+        // and never retried (retrying a permission denial cannot help);
+        // the reason becomes its error result, fed back like any other.
+        let outcome: { result: string; isError: boolean };
+        if (isToolDisabled(this.disabledTools, call.name)) {
+          const result = disabledToolResult(call.name);
+          emit({ type: 'toolDisabled', call, result });
+          outcome = { result, isError: true };
+        } else {
+          // Day 11: a failed call is retried (once by default) before
+          // anything is fed back; each retry is marked in the trace and
+          // only the final outcome becomes the tool result.
           outcome = await this.registry.execute(call);
+          for (let attempt = 1; outcome.isError && attempt <= this.maxToolRetries; attempt++) {
+            emit({ type: 'toolRetry', call, attempt, result: outcome.result });
+            outcome = await this.registry.execute(call);
+          }
         }
         // Day 9: cap what is fed back (and traced) — an over-long result
         // is truncated with a marker naming the omitted character count.

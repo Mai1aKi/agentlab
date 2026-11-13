@@ -185,6 +185,9 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .chip:hover { color: var(--ink); border-color: var(--line-strong); background: var(--panel); }
+/* Day 13 · tool permission toggles: a disabled tool's chip dims and
+   reddens slightly, so the off state reads at a glance. */
+.chip.tool-toggle[aria-pressed="true"] { color: #fda4af; border-color: rgba(251, 113, 133, 0.45); opacity: 0.75; }
 
 .chat {
   flex: 1 1 auto;

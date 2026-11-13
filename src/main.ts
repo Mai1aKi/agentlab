@@ -39,6 +39,7 @@ const baseUrlEl = document.getElementById('base-url') as HTMLInputElement;
 const modelNameEl = document.getElementById('model-name') as HTMLInputElement;
 const apiKeyEl = document.getElementById('api-key') as HTMLInputElement;
 const samplesEl = document.getElementById('samples') as HTMLDivElement;
+const toolTogglesEl = document.getElementById('tool-toggles') as HTMLDivElement;
 const chatEl = document.getElementById('chat') as HTMLDivElement;
 const traceEl = document.getElementById('trace') as HTMLDivElement;
 const inputEl = document.getElementById('task-input') as HTMLInputElement;
@@ -59,6 +60,31 @@ let lastTrace: TraceEvent[] = [];
 /** Every visible bubble this session, in order, for the Markdown
  *  conversation export (Day 12). */
 const chatLog: ConversationMessage[] = [];
+
+/** Tools the user has disabled in the console (Day 13). Passed to the
+ *  Agent on every run; calls to a disabled tool are skipped and the
+ *  reason is fed back to the model. */
+const disabledTools = new Set<string>();
+
+function renderToolToggles(): void {
+  toolTogglesEl.innerHTML = '';
+  for (const spec of createDefaultRegistry().listSpecs()) {
+    const disabled = disabledTools.has(spec.name);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip tool-toggle';
+    chip.setAttribute('aria-pressed', String(disabled));
+    chip.textContent = `${spec.name} · ${disabled ? '关' : '开'}`;
+    chip.title = disabled ? `点击启用 ${spec.name}` : `点击禁用 ${spec.name}`;
+    chip.addEventListener('click', () => {
+      if (disabledTools.has(spec.name)) disabledTools.delete(spec.name);
+      else disabledTools.add(spec.name);
+      renderToolToggles();
+    });
+    toolTogglesEl.appendChild(chip);
+  }
+}
+renderToolToggles();
 
 // Restore BYOK settings (key stays in this browser's localStorage only).
 try {
@@ -172,6 +198,11 @@ function addTrace(event: TraceEvent): void {
         `<span class="t-tag error">工具重试</span> ` +
         `<code>${escapeHtml(event.call.name)}</code> 第 ${event.attempt} 次重试（上次失败：${escapeHtml(event.result)}）`;
       break;
+    case 'toolDisabled':
+      div.innerHTML =
+        `<span class="t-tag error">工具禁用</span> ` +
+        `<code>${escapeHtml(event.call.name)}</code> 已被禁用，本次调用跳过（${escapeHtml(event.result)}）`;
+      break;
     case 'planCreated':
       div.innerHTML =
         `<span class="t-tag tool">计划</span> 共 ${event.steps.length} 步，开始逐步执行` +
@@ -223,7 +254,7 @@ async function runTask(text: string): Promise<void> {
       lastTrace.push({ type: 'user', content: task });
       addTrace({ type: 'user', content: task });
       const suite = await runEvalSuite(async (prompt) => {
-        const bench = new Agent(new MockModel(), createDefaultRegistry());
+        const bench = new Agent(new MockModel(), createDefaultRegistry(), { disabledTools });
         return bench.run(prompt);
       });
       const report = formatEvalReport(suite.results, suite.summary);
@@ -275,6 +306,7 @@ async function runTask(text: string): Promise<void> {
   // Markdown rendering of the final answer when the run completes.
   const stream: { el: HTMLDivElement | null; text: string } = { el: null, text: '' };
   const agent = new Agent(model, createDefaultRegistry(), {
+    disabledTools,
     onTextDelta: (delta) => {
       stream.text += delta;
       if (!stream.el) {

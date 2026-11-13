@@ -40,6 +40,8 @@ function renderTraceEvent(event: TraceEvent, index: number): string {
       );
     case 'toolRetry':
       return `${n}. **工具重试**：\`${event.call.name}\` 第 ${event.attempt} 次重试（上次失败：${event.result}）`;
+    case 'toolDisabled':
+      return `${n}. **工具禁用**：\`${event.call.name}\` 已被禁用，跳过执行（${event.result}）`;
     case 'memoryCompressed':
       return (
         `${n}. **记忆压缩**：早期 ${event.summarizedCount} 条已摘要，保留最近 ${event.keptCount} 条` +
