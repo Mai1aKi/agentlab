@@ -10,6 +10,11 @@ import { formatEvalReport, runEvalSuite } from './agent/eval';
 import { MockModel } from './agent/mockModel';
 import { runMultiAgent } from './agent/multiAgent';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
+import {
+  clearSessionFrom,
+  loadSessionFrom,
+  saveSessionTo,
+} from './agent/session';
 import { formatRunStats } from './agent/stats';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
@@ -49,6 +54,7 @@ const exportTraceBtn = document.getElementById('export-trace-btn') as HTMLButton
 const exportConversationBtn = document.getElementById(
   'export-conversation-btn',
 ) as HTMLButtonElement;
+const clearSessionBtn = document.getElementById('clear-session-btn') as HTMLButtonElement;
 const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButtonElement;
 const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
 const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
@@ -147,8 +153,18 @@ for (const el of [baseUrlEl, modelNameEl, apiKeyEl]) {
 }
 syncModelStatus();
 
-function addBubble(role: 'user' | 'assistant', text: string): void {
-  chatLog.push({ role, text });
+/** Persist the visible conversation + the most recent trace so a
+ *  refresh restores them (Day 14). Storage failures (quota, private
+ *  mode) must never break a run, so they are swallowed here. */
+function persistSession(): void {
+  try {
+    saveSessionTo(localStorage, chatLog, lastTrace);
+  } catch {
+    // ignore: the console still works without a saved session
+  }
+}
+
+function renderBubble(role: 'user' | 'assistant', text: string): void {
   const div = document.createElement('div');
   div.className = `bubble ${role}`;
   // Assistant replies are Markdown (real models answer in it); the
@@ -158,6 +174,12 @@ function addBubble(role: 'user' | 'assistant', text: string): void {
   else div.textContent = text;
   chatEl.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function addBubble(role: 'user' | 'assistant', text: string): void {
+  chatLog.push({ role, text });
+  renderBubble(role, text);
+  persistSession();
 }
 
 function addTrace(event: TraceEvent): void {
@@ -329,6 +351,7 @@ async function runTask(text: string): Promise<void> {
       // The streamed bubble never went through addBubble, so record
       // its final text in the chat log here (Day 12).
       chatLog.push({ role: 'assistant', text: result.finalText });
+      persistSession();
       stream.el.innerHTML = renderMarkdown(result.finalText);
     } else addBubble('assistant', result.finalText);
     statusEl.textContent = `模型：${model.name} · 步数：${result.steps} · 耗时 ${(performance.now() - started).toFixed(0)} ms`;
@@ -375,6 +398,15 @@ exportConversationBtn.addEventListener('click', () => {
   statusEl.textContent = `已导出对话 Markdown：${chatLog.length} 条消息 · ${lastTrace.length} 个轨迹事件`;
 });
 
+clearSessionBtn.addEventListener('click', () => {
+  try {
+    clearSessionFrom(localStorage);
+    statusEl.textContent = '已清除保存的会话存档，刷新后将重新开始。';
+  } catch {
+    statusEl.textContent = '清除会话存档失败：浏览器存储不可用。';
+  }
+});
+
 importTraceBtn.addEventListener('click', () => importTraceFile.click());
 importTraceFile.addEventListener('change', () => {
   const file = importTraceFile.files?.[0];
@@ -386,6 +418,7 @@ importTraceFile.addEventListener('change', () => {
       traceEl.innerHTML = '';
       lastTrace = [...events];
       const count = replayTrace(events, addTrace);
+      persistSession();
       statusEl.textContent = `已回放导入的轨迹：${count} 个事件`;
     } catch (e) {
       statusEl.textContent = `导入失败：${e instanceof Error ? e.message : String(e)}`;
@@ -423,5 +456,19 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-// First paint: run the calculator sample so the trace is visible.
-void runTask(SAMPLES[0]);
+// First paint: restore the saved session if there is one (Day 14) —
+// bubbles and the last trace come back without re-running anything.
+// With nothing saved, run the calculator sample so the trace is
+// visible.
+const restoredSession = loadSessionFrom(localStorage);
+if (restoredSession && restoredSession.chat.length > 0) {
+  for (const message of restoredSession.chat) {
+    chatLog.push(message);
+    renderBubble(message.role, message.text);
+  }
+  lastTrace = [...restoredSession.trace];
+  for (const event of lastTrace) addTrace(event);
+  statusEl.textContent = `已恢复上次会话：${restoredSession.chat.length} 条消息 · ${lastTrace.length} 个轨迹事件`;
+} else {
+  void runTask(SAMPLES[0]);
+}
