@@ -16,6 +16,7 @@ import {
   saveSessionTo,
 } from './agent/session';
 import { formatRunStats } from './agent/stats';
+import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
@@ -44,6 +45,7 @@ const baseUrlEl = document.getElementById('base-url') as HTMLInputElement;
 const modelNameEl = document.getElementById('model-name') as HTMLInputElement;
 const apiKeyEl = document.getElementById('api-key') as HTMLInputElement;
 const samplesEl = document.getElementById('samples') as HTMLDivElement;
+const templatesEl = document.getElementById('templates') as HTMLDivElement;
 const toolTogglesEl = document.getElementById('tool-toggles') as HTMLDivElement;
 const chatEl = document.getElementById('chat') as HTMLDivElement;
 const traceEl = document.getElementById('trace') as HTMLDivElement;
@@ -433,6 +435,27 @@ for (const sample of SAMPLES) {
   chip.textContent = sample;
   chip.addEventListener('click', () => void runTask(sample));
   samplesEl.appendChild(chip);
+}
+
+// Day 15 · Prompt templates: clicking one only fills the input —
+// the user edits the {placeholders} first, then runs it. Templates
+// never run on click (that is what the sample tasks above do).
+for (const template of BUILTIN_PROMPT_TEMPLATES) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'chip';
+  chip.textContent = template.label;
+  chip.title = template.prompt;
+  chip.addEventListener('click', () => {
+    inputEl.value = template.prompt;
+    inputEl.focus();
+    // Select the first placeholder so editing starts right there.
+    const start = template.prompt.indexOf('{');
+    const end = template.prompt.indexOf('}');
+    if (start >= 0 && end > start) inputEl.setSelectionRange(start, end + 1);
+    statusEl.textContent = `已填入模板「${template.label}」，编辑后点运行。`;
+  });
+  templatesEl.appendChild(chip);
 }
 
 runBtn.addEventListener('click', () => {
