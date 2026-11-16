@@ -18,6 +18,12 @@ import {
 import { formatRunStats } from './agent/stats';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
+import {
+  matchesTraceFilter,
+  normalizeTraceFilter,
+  traceEventCategory,
+  type TraceFilter,
+} from './agent/traceFilter';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
 import { renderMarkdown } from './markdown';
@@ -64,6 +70,37 @@ const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanEleme
 
 /** The most recent run's trace, for export (Day 5). */
 let lastTrace: TraceEvent[] = [];
+
+/** Which trace events the panel currently shows (Day 16). Filtering
+ *  only hides rendered items; `lastTrace` always keeps everything,
+ *  so export and replay are unaffected. */
+let traceFilter: TraceFilter = 'all';
+
+function applyTraceFilter(): void {
+  for (const child of Array.from(traceEl.children)) {
+    const item = child as HTMLElement;
+    const category = item.dataset.category;
+    item.hidden =
+      traceFilter !== 'all' && category !== traceFilter;
+  }
+  for (const btn of Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-trace-filter]'),
+  )) {
+    btn.setAttribute(
+      'aria-pressed',
+      String(normalizeTraceFilter(btn.dataset.traceFilter) === traceFilter),
+    );
+  }
+}
+
+for (const btn of Array.from(
+  document.querySelectorAll<HTMLButtonElement>('[data-trace-filter]'),
+)) {
+  btn.addEventListener('click', () => {
+    traceFilter = normalizeTraceFilter(btn.dataset.traceFilter);
+    applyTraceFilter();
+  });
+}
 
 /** Every visible bubble this session, in order, for the Markdown
  *  conversation export (Day 12). */
@@ -187,6 +224,8 @@ function addBubble(role: 'user' | 'assistant', text: string): void {
 function addTrace(event: TraceEvent): void {
   const div = document.createElement('div');
   div.className = 'trace-item';
+  div.dataset.category = traceEventCategory(event);
+  if (!matchesTraceFilter(event, traceFilter)) div.hidden = true;
   switch (event.type) {
     case 'user':
       traceSummaryEl.textContent = '';

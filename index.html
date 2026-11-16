@@ -69,6 +69,12 @@
         <button id="clear-session-btn" type="button" class="chip chip-sm">清除会话存档</button>
         <input id="import-trace-file" type="file" accept="application/json,.json" hidden>
       </div>
+      <div class="toolbar trace-actions" role="group" aria-label="轨迹筛选">
+        <span class="toolbar-label">轨迹筛选</span>
+        <button type="button" class="chip chip-sm trace-filter-chip" data-trace-filter="all" aria-pressed="true">全部</button>
+        <button type="button" class="chip chip-sm trace-filter-chip" data-trace-filter="tool" aria-pressed="false">只看工具</button>
+        <button type="button" class="chip chip-sm trace-filter-chip" data-trace-filter="model" aria-pressed="false">只看模型</button>
+      </div>
       <div id="trace" class="trace"></div>
     </aside>
   </main>
