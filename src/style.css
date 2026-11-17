@@ -346,6 +346,14 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
   line-height: 1.5;
 }
 .trace-actions { flex-wrap: wrap; overflow: visible; padding: 10px 16px; gap: 8px; }
+/* Day 17 · cost comparison: a compact table of recent runs' costs
+   between the trace actions and the trace itself. */
+.cost-comparison { flex: 0 0 auto; padding: 4px 16px 10px; }
+.cost-comparison-title { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-faint); margin-bottom: 6px; }
+.cost-comparison table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.74rem; color: var(--ink-dim); }
+.cost-comparison th, .cost-comparison td { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cost-comparison th:first-child, .cost-comparison td:first-child { text-align: left; white-space: normal; word-break: break-all; }
+.cost-comparison tfoot td { color: var(--ink); border-bottom: none; }
 .chip-sm { font-size: 0.78rem; padding: 5px 11px; }
 .trace {
   flex: 1 1 auto;

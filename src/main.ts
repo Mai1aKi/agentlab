@@ -15,6 +15,11 @@ import {
   loadSessionFrom,
   saveSessionTo,
 } from './agent/session';
+import {
+  recordRunCost,
+  summarizeRunCosts,
+  type RunCostEntry,
+} from './agent/costComparison';
 import { formatRunStats } from './agent/stats';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
@@ -67,6 +72,38 @@ const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButton
 const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
 const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
 const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanElement;
+const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivElement;
+
+/** Cost history of this session's normal runs (Day 17): every
+ *  finished run appends one row, rendered as a small comparison
+ *  table under the trace actions. Eval-bench and multi-agent runs
+ *  produce no RunStats, so they stay out of the table. */
+let runCostHistory: RunCostEntry[] = [];
+
+function renderCostComparison(): void {
+  if (runCostHistory.length === 0) {
+    costComparisonEl.hidden = true;
+    costComparisonEl.innerHTML = '';
+    return;
+  }
+  const summary = summarizeRunCosts(runCostHistory);
+  const rows = runCostHistory
+    .map(
+      (entry, i) =>
+        `<tr><td title="${escapeHtml(entry.label)}">${i + 1}. ${escapeHtml(entry.label)}</td>` +
+        `<td>${entry.stats.steps}</td><td>${entry.stats.toolCalls}</td>` +
+        `<td>${entry.stats.toolErrors}</td><td>${entry.stats.durationMs} ms</td></tr>`,
+    )
+    .join('');
+  costComparisonEl.innerHTML =
+    `<div class="cost-comparison-title">成本对比 · 最近 ${summary.runs} 次运行</div>` +
+    `<table><thead><tr><th>任务</th><th>步数</th><th>工具</th><th>失败</th><th>耗时</th></tr></thead>` +
+    `<tbody>${rows}</tbody>` +
+    `<tfoot><tr><td>合计 · 平均步数 ${summary.averageSteps.toFixed(1)} · 平均耗时 ${summary.averageDurationMs} ms</td>` +
+    `<td>${summary.totalSteps}</td><td>${summary.totalToolCalls}</td>` +
+    `<td>${summary.totalToolErrors}</td><td>${summary.totalDurationMs} ms</td></tr></tfoot></table>`;
+  costComparisonEl.hidden = false;
+}
 
 /** The most recent run's trace, for export (Day 5). */
 let lastTrace: TraceEvent[] = [];
@@ -388,6 +425,8 @@ async function runTask(text: string): Promise<void> {
       lastTrace.push(event);
       addTrace(event);
     });
+    runCostHistory = recordRunCost(runCostHistory, task, result.stats);
+    renderCostComparison();
     if (stream.el) {
       // The streamed bubble never went through addBubble, so record
       // its final text in the chat log here (Day 12).
