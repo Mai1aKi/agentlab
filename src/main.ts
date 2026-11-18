@@ -20,6 +20,10 @@ import {
   summarizeRunCosts,
   type RunCostEntry,
 } from './agent/costComparison';
+import {
+  formatShortcutHint,
+  resolveShortcutAction,
+} from './agent/shortcuts';
 import { formatRunStats } from './agent/stats';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
@@ -541,11 +545,24 @@ runBtn.addEventListener('click', () => {
   inputEl.value = '';
   void runTask(value);
 });
+// Day 18 · Keyboard shortcuts: Ctrl/Cmd+Enter (and plain Enter)
+// runs the task, Esc clears the input. The decision lives in the
+// pure resolveShortcutAction helper, so IME compositions and
+// modified Escapes never fire by accident.
+const shortcutHintEl = document.getElementById('shortcut-hint');
+if (shortcutHintEl) shortcutHintEl.textContent = formatShortcutHint();
 inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
+  const action = resolveShortcutAction(e);
+  if (action === 'run') {
+    e.preventDefault();
     const value = inputEl.value;
     inputEl.value = '';
     void runTask(value);
+  } else if (action === 'clear') {
+    e.preventDefault();
+    const hadText = inputEl.value.length > 0;
+    inputEl.value = '';
+    if (hadText) statusEl.textContent = '已清空输入。';
   }
 });
 

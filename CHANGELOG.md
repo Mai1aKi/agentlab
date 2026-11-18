@@ -1,5 +1,13 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 18 — 2026-11-17
+
+快捷键：Ctrl/Cmd+Enter 运行任务，Esc 清空输入。
+
+- 快捷键模块（`src/agent/shortcuts.ts`）：纯函数——`resolveShortcutAction` 把一次按键映射为 `run` / `clear` / 无动作：Enter 运行（普通 Enter 保持原有行为，Ctrl+Enter 与 Cmd+Enter 同样运行，Alt+Enter 不触发），无修饰的 Esc 清空输入（Ctrl/Cmd/Alt+Esc 留给系统）；输入法组合中（`isComposing`）一律不触发，中文输入不会误跑误清；`formatShortcutHint` 给出控制台展示的快捷键提示文案，测试钉住的文案就是用户看到的文案
+- 控制台（`src/main.ts` + `index.html`）：任务输入框的 keydown 改走 `resolveShortcutAction`——运行类按键先 `preventDefault` 再清空输入并运行，Esc 清空输入且原本有内容时在状态栏报「已清空输入」；输入框加 `title` 提示，输入区下方提示行新增由 `formatShortcutHint` 填入的快捷键说明
+- 单元测试新增 6 个（共 149 个）：Ctrl/Cmd+Enter 运行、普通 Enter 运行与 Alt+Enter 不触发、无修饰 Esc 清空与修饰 Esc 不触发、普通打字与未知键无动作、输入法组合中不触发、提示文案钉住
+
 ## Day 17 — 2026-11-16
 
 成本对比：多次运行的运行成本汇总成一张小表。
