@@ -33,6 +33,12 @@ import {
   traceEventCategory,
   type TraceFilter,
 } from './agent/traceFilter';
+import {
+  formatTraceSearchSummary,
+  matchesTraceSearch,
+  normalizeTraceQuery,
+  traceEventSearchText,
+} from './agent/traceSearch';
 import type { ChatModel, TraceEvent } from './agent/types';
 import { initParticles } from './particles';
 import { renderMarkdown } from './markdown';
@@ -77,6 +83,8 @@ const importTraceFile = document.getElementById('import-trace-file') as HTMLInpu
 const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
 const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanElement;
 const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivElement;
+const traceSearchInputEl = document.getElementById('trace-search-input') as HTMLInputElement | null;
+const traceSearchCountEl = document.getElementById('trace-search-count') as HTMLSpanElement | null;
 
 /** Cost history of this session's normal runs (Day 17): every
  *  finished run appends one row, rendered as a small comparison
@@ -117,12 +125,32 @@ let lastTrace: TraceEvent[] = [];
  *  so export and replay are unaffected. */
 let traceFilter: TraceFilter = 'all';
 
+/** Keyword narrowing the trace panel (Day 19). Combined with the
+ *  Day 16 category filter: an event shows only when it passes
+ *  both. Search only hides rendered items; `lastTrace` always
+ *  keeps everything, so export and replay are unaffected. */
+let traceSearchQuery = '';
+
 function applyTraceFilter(): void {
+  const query = normalizeTraceQuery(traceSearchQuery);
+  let total = 0;
+  let visible = 0;
   for (const child of Array.from(traceEl.children)) {
     const item = child as HTMLElement;
+    total += 1;
     const category = item.dataset.category;
-    item.hidden =
-      traceFilter !== 'all' && category !== traceFilter;
+    const passesFilter = traceFilter === 'all' || category === traceFilter;
+    const passesSearch =
+      query === '' || (item.dataset.searchText ?? '').includes(query);
+    item.hidden = !(passesFilter && passesSearch);
+    if (!item.hidden) visible += 1;
+  }
+  if (traceSearchCountEl) {
+    traceSearchCountEl.textContent = formatTraceSearchSummary(
+      traceSearchQuery,
+      visible,
+      total,
+    );
   }
   for (const btn of Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-trace-filter]'),
@@ -133,6 +161,11 @@ function applyTraceFilter(): void {
     );
   }
 }
+
+traceSearchInputEl?.addEventListener('input', () => {
+  traceSearchQuery = traceSearchInputEl.value;
+  applyTraceFilter();
+});
 
 for (const btn of Array.from(
   document.querySelectorAll<HTMLButtonElement>('[data-trace-filter]'),
@@ -266,7 +299,8 @@ function addTrace(event: TraceEvent): void {
   const div = document.createElement('div');
   div.className = 'trace-item';
   div.dataset.category = traceEventCategory(event);
-  if (!matchesTraceFilter(event, traceFilter)) div.hidden = true;
+  div.dataset.searchText = traceEventSearchText(event).toLowerCase();
+  if (!matchesTraceFilter(event, traceFilter) || !matchesTraceSearch(event, traceSearchQuery)) div.hidden = true;
   switch (event.type) {
     case 'user':
       traceSummaryEl.textContent = '';
@@ -339,6 +373,7 @@ function addTrace(event: TraceEvent): void {
       break;
   }
   traceEl.appendChild(div);
+  applyTraceFilter();
   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 

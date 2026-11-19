@@ -192,6 +192,10 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
    and filtered-out trace items leave the panel entirely. */
 .chip.trace-filter-chip[aria-pressed="true"] { color: var(--ink); border-color: var(--line-strong); background: var(--panel-2); }
 .trace-item[hidden] { display: none; }
+/* Day 19 · trace search: a compact keyword box beside the filter
+   chips, with a mono hit count. */
+.trace-search-input { flex: 1 1 140px; min-width: 0; padding: 6px 10px; font-size: 0.82rem; border-radius: 999px; }
+.trace-search-count { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-dim); white-space: nowrap; }
 
 .chat {
   flex: 1 1 auto;

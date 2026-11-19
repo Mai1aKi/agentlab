@@ -75,6 +75,11 @@
         <button type="button" class="chip chip-sm trace-filter-chip" data-trace-filter="tool" aria-pressed="false">只看工具</button>
         <button type="button" class="chip chip-sm trace-filter-chip" data-trace-filter="model" aria-pressed="false">只看模型</button>
       </div>
+      <div class="toolbar trace-actions" role="search" aria-label="轨迹搜索">
+        <span class="toolbar-label">轨迹搜索</span>
+        <input id="trace-search-input" class="trace-search-input" type="text" placeholder="按关键词过滤轨迹，如 calculator" aria-label="按关键词过滤轨迹事件">
+        <span id="trace-search-count" class="trace-search-count"></span>
+      </div>
       <div id="cost-comparison" class="cost-comparison" hidden></div>
       <div id="trace" class="trace"></div>
     </aside>
