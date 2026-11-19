@@ -7,7 +7,13 @@
    v5 polish (2026-11-09): no clipped controls (wrapping trace
    actions, fading sample row), a centered reading column, a
    compact trace with run cost as a header summary instead of a
-   card, and a model-readiness status in the top bar. */
+   card, and a model-readiness status in the top bar.
+   v6 humanization (2026-11-18): progressive disclosure — the
+   template / tool-toggle rows and the trace data actions are
+   collapsed behind small toggles so the first screen shows only
+   the essentials; plain-language labels everywhere (friendly
+   tool names, click-behavior notes on each chip row), a trace
+   empty state, and readable hint / status text. */
 
 :root {
   --bg: #0a0a0b;
@@ -141,6 +147,7 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
 }
 .byok-strip[hidden] { display: none; }
 .byok-strip input { flex: 1 1 200px; }
+.byok-note { flex: 1 1 100%; margin: 0; font-size: 0.78rem; color: var(--ink-faint); }
 
 /* ---------- workspace ---------- */
 
@@ -171,6 +178,50 @@ select:focus, input[type="text"]:focus, input[type="password"]:focus {
   -webkit-mask-image: linear-gradient(to right, #000 93%, transparent 100%);
 }
 .toolbar-label { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.14em; color: var(--ink-faint); white-space: nowrap; }
+.toolbar[hidden] { display: none; }
+
+/* UI v6 · disclosure bars: one quiet text button + a plain-language
+   hint; the chevron rotates when the section is open. */
+.disclosure-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.trace-disclosure { padding: 9px 16px; }
+.disclosure-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--ink-dim);
+  font-size: 0.84rem;
+  font-weight: 550;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.disclosure-toggle:hover { color: var(--ink); }
+.disclosure-toggle .chev { color: var(--ink-faint); font-size: 1rem; line-height: 1; transition: transform 0.15s; }
+.disclosure-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.disclosure-hint { font-size: 0.78rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* UI v6 · empty state: a dashed, plainly worded note where content
+   will appear, instead of a blank black void. */
+.empty-note {
+  flex: 0 0 auto;
+  margin: 14px 16px 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink-dim);
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+.empty-note[hidden] { display: none; }
 .samples { display: flex; gap: 8px; }
 .chip {
   font: inherit;
@@ -313,8 +364,8 @@ button.primary {
 }
 button.primary:hover:not(:disabled) { background: #fff; }
 button.primary:disabled { opacity: 0.5; cursor: wait; }
-.status { margin-top: 10px; min-height: 1.1em; color: var(--ink-faint); font-size: 0.82rem; font-family: var(--mono); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hint { margin: 4px 0 2px; color: #43434b; font-size: 0.78rem; line-height: 1.6; }
+.status { margin-top: 10px; min-height: 1.1em; color: var(--ink-dim); font-size: 0.82rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hint { margin: 4px 0 2px; color: #83838d; font-size: 0.78rem; line-height: 1.6; }
 
 /* ----- trace inspector ----- */
 

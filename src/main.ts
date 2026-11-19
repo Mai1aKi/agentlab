@@ -85,6 +85,23 @@ const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanEleme
 const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivElement;
 const traceSearchInputEl = document.getElementById('trace-search-input') as HTMLInputElement | null;
 const traceSearchCountEl = document.getElementById('trace-search-count') as HTMLSpanElement | null;
+const traceEmptyEl = document.getElementById('trace-empty') as HTMLDivElement | null;
+
+/** UI v6 · Progressive disclosure: secondary controls (prompt
+ *  templates + tool toggles on the left, export / import / clear
+ *  on the right) live behind a small toggle, collapsed by default,
+ *  so the first screen only shows what a newcomer needs. */
+function wireDisclosure(toggleId: string, panelId: string): void {
+  const toggle = document.getElementById(toggleId) as HTMLButtonElement | null;
+  const panel = document.getElementById(panelId) as HTMLElement | null;
+  if (!toggle || !panel) return;
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+}
+wireDisclosure('advanced-toggle', 'advanced-panel');
+wireDisclosure('trace-tools-toggle', 'trace-tools-panel');
 
 /** Cost history of this session's normal runs (Day 17): every
  *  finished run appends one row, rendered as a small comparison
@@ -108,7 +125,7 @@ function renderCostComparison(): void {
     )
     .join('');
   costComparisonEl.innerHTML =
-    `<div class="cost-comparison-title">成本对比 · 最近 ${summary.runs} 次运行</div>` +
+    `<div class="cost-comparison-title">历次运行对比 · 最近 ${summary.runs} 次</div>` +
     `<table><thead><tr><th>任务</th><th>步数</th><th>工具</th><th>失败</th><th>耗时</th></tr></thead>` +
     `<tbody>${rows}</tbody>` +
     `<tfoot><tr><td>合计 · 平均步数 ${summary.averageSteps.toFixed(1)} · 平均耗时 ${summary.averageDurationMs} ms</td>` +
@@ -185,6 +202,16 @@ const chatLog: ConversationMessage[] = [];
  *  reason is fed back to the model. */
 const disabledTools = new Set<string>();
 
+/** Friendly Chinese names for the tool toggles (UI v6): the raw
+ *  spec names are developer jargon, so the chip shows what the
+ *  tool does in plain words and keeps the spec name in the title. */
+const TOOL_FRIENDLY_NAMES: Record<string, string> = {
+  calculator: '计算器',
+  clock: '时钟',
+  kb_search: '知识库检索',
+  kb_import: '知识库导入',
+};
+
 function renderToolToggles(): void {
   toolTogglesEl.innerHTML = '';
   for (const spec of createDefaultRegistry().listSpecs()) {
@@ -193,8 +220,8 @@ function renderToolToggles(): void {
     chip.type = 'button';
     chip.className = 'chip tool-toggle';
     chip.setAttribute('aria-pressed', String(disabled));
-    chip.textContent = `${spec.name} · ${disabled ? '关' : '开'}`;
-    chip.title = disabled ? `点击启用 ${spec.name}` : `点击禁用 ${spec.name}`;
+    chip.textContent = `${TOOL_FRIENDLY_NAMES[spec.name] ?? spec.name} · ${disabled ? '关' : '开'}`;
+    chip.title = `${spec.name}：${spec.description}（点击${disabled ? '启用' : '禁用'}）`;
     chip.addEventListener('click', () => {
       if (disabledTools.has(spec.name)) disabledTools.delete(spec.name);
       else disabledTools.add(spec.name);
@@ -296,6 +323,7 @@ function addBubble(role: 'user' | 'assistant', text: string): void {
 }
 
 function addTrace(event: TraceEvent): void {
+  if (traceEmptyEl) traceEmptyEl.hidden = true;
   const div = document.createElement('div');
   div.className = 'trace-item';
   div.dataset.category = traceEventCategory(event);

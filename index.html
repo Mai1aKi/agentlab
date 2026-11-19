@@ -25,34 +25,41 @@
   </header>
 
   <div id="byok-fields" class="byok-strip" hidden>
-    <input id="base-url" type="text" value="https://api.openai.com/v1" aria-label="API 基础地址">
-    <input id="model-name" type="text" placeholder="模型名，如 gpt-4o-mini" aria-label="模型名">
+    <input id="base-url" type="text" value="https://api.openai.com/v1" placeholder="API 地址，如 https://api.deepseek.com/v1" aria-label="API 基础地址">
+    <input id="model-name" type="text" placeholder="模型名，如 deepseek-flash" aria-label="模型名">
     <input id="api-key" type="password" placeholder="API Key（只存在你浏览器本地）" aria-label="API Key">
+    <p class="byok-note">Key 只保存在你这台浏览器里，刷新不丢；AgentLab 没有服务器，不会经手你的 Key。</p>
   </div>
 
   <main class="workspace">
     <section class="chat-panel">
       <div class="toolbar">
-        <span class="toolbar-label">示例任务</span>
+        <span class="toolbar-label">示例任务 · 点一下直接运行</span>
         <div id="samples" class="samples"></div>
       </div>
-      <div class="toolbar">
-        <span class="toolbar-label">提示词模板</span>
-        <div id="templates" class="samples"></div>
+      <div class="disclosure-bar">
+        <button id="advanced-toggle" type="button" class="disclosure-toggle" aria-expanded="false" aria-controls="advanced-panel">更多玩法与设置 <span class="chev" aria-hidden="true">›</span></button>
+        <span class="disclosure-hint">提示词模板、工具开关，平时收在这里</span>
       </div>
-      <div class="toolbar">
-        <span class="toolbar-label">工具开关</span>
-        <div id="tool-toggles" class="samples"></div>
+      <div id="advanced-panel" hidden>
+        <div class="toolbar">
+          <span class="toolbar-label">提示词模板 · 填入输入框，改好再运行</span>
+          <div id="templates" class="samples"></div>
+        </div>
+        <div class="toolbar">
+          <span class="toolbar-label">工具开关 · 关掉后 Agent 就用不了它</span>
+          <div id="tool-toggles" class="samples"></div>
+        </div>
       </div>
       <div id="chat" class="chat"></div>
       <div class="composer-wrap">
         <div class="composer-inner">
           <div class="composer">
-            <input id="task-input" type="text" placeholder="给 Agent 一个任务，例如：计算 (18 + 26) * 3" title="Ctrl/Cmd+Enter 运行任务，Esc 清空输入">
+            <input id="task-input" type="text" placeholder="想让 Agent 做点什么？比如：计算 (18 + 26) * 3，或问「什么是 RAG？」" title="Ctrl/Cmd+Enter 运行任务，Esc 清空输入">
             <button id="run-btn" type="button" class="primary">运行</button>
           </div>
           <div id="status" class="status"></div>
-          <p class="hint">Agent 的循环、工具调用、轨迹记录全部由本仓库手写实现；模型只负责「下一步做什么」。<span id="shortcut-hint"></span></p>
+          <p class="hint">现在是内置演示模型，免费可玩；想接真模型，把上方「模型」换成自定义 API 再填 Key。<span id="shortcut-hint"></span></p>
         </div>
       </div>
     </section>
@@ -62,7 +69,11 @@
         <h2>运行轨迹</h2>
         <span id="trace-summary" class="trace-summary"></span>
       </div>
-      <div class="toolbar trace-actions">
+      <div class="disclosure-bar trace-disclosure">
+        <button id="trace-tools-toggle" type="button" class="disclosure-toggle" aria-expanded="false" aria-controls="trace-tools-panel">导出 / 导入 / 清除 <span class="chev" aria-hidden="true">›</span></button>
+        <span class="disclosure-hint">把轨迹存下来、回放，或清掉存档</span>
+      </div>
+      <div id="trace-tools-panel" class="toolbar trace-actions" hidden>
         <button id="export-trace-btn" type="button" class="chip chip-sm">导出轨迹 JSON</button>
         <button id="export-conversation-btn" type="button" class="chip chip-sm">导出对话 Markdown</button>
         <button id="import-trace-btn" type="button" class="chip chip-sm">导入并回放</button>
@@ -81,6 +92,7 @@
         <span id="trace-search-count" class="trace-search-count"></span>
       </div>
       <div id="cost-comparison" class="cost-comparison" hidden></div>
+      <div id="trace-empty" class="empty-note">运行一个任务后，这里会一步一步显示 Agent 先想什么、再调用哪个工具、最后怎么得出答案。</div>
       <div id="trace" class="trace"></div>
     </aside>
   </main>
