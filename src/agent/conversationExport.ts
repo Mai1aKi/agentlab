@@ -5,6 +5,7 @@
 // formats them, so the exact file content is testable without a DOM.
 
 import { formatRunStats } from './stats';
+import { formatToolDuration } from './toolTiming';
 import type { TraceEvent } from './types';
 
 /** One visible chat bubble, in display order. Only user / assistant
@@ -36,6 +37,7 @@ function renderTraceEvent(event: TraceEvent, index: number): string {
     case 'toolResult':
       return (
         `${n}. **工具结果${event.isError ? '（失败）' : ''}**：\`${event.call.name}\`` +
+        `${typeof event.durationMs === 'number' ? ` · ${formatToolDuration(event.durationMs)}` : ''}` +
         `\n\n\`\`\`\n${event.result}\n\`\`\``
       );
     case 'toolRetry':

@@ -25,6 +25,7 @@ import {
   resolveShortcutAction,
 } from './agent/shortcuts';
 import { formatRunStats } from './agent/stats';
+import { formatToolDuration } from './agent/toolTiming';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
 import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
 import {
@@ -357,7 +358,7 @@ function addTrace(event: TraceEvent): void {
     case 'toolResult':
       div.innerHTML =
         `<span class="t-tag ${event.isError ? 'error' : 'tool'}">工具结果</span> ` +
-        `<code>${escapeHtml(event.call.name)}</code><pre>${escapeHtml(event.result)}</pre>`;
+        `<code>${escapeHtml(event.call.name)}</code> ${escapeHtml(formatToolDuration(event.durationMs))}<pre>${escapeHtml(event.result)}</pre>`;
       break;
     case 'toolRetry':
       div.innerHTML =

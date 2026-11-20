@@ -68,7 +68,15 @@ export interface RunStats {
 export type TraceEvent =
   | { type: 'user'; content: string }
   | { type: 'modelReply'; step: number; reply: ModelReply }
-  | { type: 'toolResult'; call: ToolCall; result: string; isError: boolean }
+  | {
+      type: 'toolResult';
+      call: ToolCall;
+      result: string;
+      isError: boolean;
+      /** How long this call took in milliseconds (Day 20). Optional
+       *  so traces recorded before Day 20 remain valid. */
+      durationMs?: number;
+    }
   | { type: 'toolRetry'; call: ToolCall; attempt: number; result: string }
   | { type: 'toolDisabled'; call: ToolCall; result: string }
   | { type: 'memoryCompressed'; summarizedCount: number; keptCount: number; summary: string }

@@ -45,7 +45,8 @@ export function traceEventSearchText(event: TraceEvent): string {
     case 'toolResult':
       return (
         `${event.type} ${event.call.name} ${JSON.stringify(event.call.args)} ` +
-        `${event.result}${event.isError ? ' error' : ''}`
+        `${event.result}${event.isError ? ' error' : ''}` +
+        `${typeof event.durationMs === 'number' ? ` durationMs ${event.durationMs}` : ''}`
       );
     case 'toolRetry':
       return `${event.type} ${event.call.name} ${JSON.stringify(event.call.args)} ${event.attempt} ${event.result}`;

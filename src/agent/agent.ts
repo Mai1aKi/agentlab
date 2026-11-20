@@ -14,6 +14,7 @@ import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from
 import { resolveMaxToolRetries } from './retry';
 import { computeRunStats } from './stats';
 import { ToolRegistry } from './tools';
+import { measureToolDuration } from './toolTiming';
 import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
 import type { ChatModel, Message, RunStats, TraceEvent } from './types';
 
@@ -184,7 +185,11 @@ export class Agent {
         // Day 13: a disabled tool is skipped entirely — never executed
         // and never retried (retrying a permission denial cannot help);
         // the reason becomes its error result, fed back like any other.
+        // Day 20: each call is timed with the injectable clock; the
+        // duration covers all retry attempts of that call, and a
+        // skipped (disabled) call reports 0 ms.
         let outcome: { result: string; isError: boolean };
+        let durationMs = 0;
         if (isToolDisabled(this.disabledTools, call.name)) {
           const result = disabledToolResult(call.name);
           emit({ type: 'toolDisabled', call, result });
@@ -193,11 +198,13 @@ export class Agent {
           // Day 11: a failed call is retried (once by default) before
           // anything is fed back; each retry is marked in the trace and
           // only the final outcome becomes the tool result.
+          const toolStartedAt = this.now();
           outcome = await this.registry.execute(call);
           for (let attempt = 1; outcome.isError && attempt <= this.maxToolRetries; attempt++) {
             emit({ type: 'toolRetry', call, attempt, result: outcome.result });
             outcome = await this.registry.execute(call);
           }
+          durationMs = measureToolDuration(toolStartedAt, this.now());
         }
         // Day 9: cap what is fed back (and traced) — an over-long result
         // is truncated with a marker naming the omitted character count.
@@ -213,6 +220,7 @@ export class Agent {
           call,
           result: fedBack,
           isError: outcome.isError,
+          durationMs,
         });
         // Tick off the next plan step now that this call has finished.
         if (plan) {
