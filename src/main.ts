@@ -24,6 +24,7 @@ import {
   formatShortcutHint,
   resolveShortcutAction,
 } from './agent/shortcuts';
+import { formatPlanReview } from './agent/planReview';
 import { formatRunStats } from './agent/stats';
 import { formatToolDuration } from './agent/toolTiming';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
@@ -388,6 +389,9 @@ function addTrace(event: TraceEvent): void {
       div.innerHTML =
         `<span class="t-tag tool">记忆压缩</span> 早期 ${event.summarizedCount} 条已摘要，保留最近 ${event.keptCount} 条` +
         `<pre>${escapeHtml(event.summary)}</pre>`;
+      break;
+    case 'planReview':
+      div.innerHTML = `<span class="t-tag final">计划回看</span> ${escapeHtml(formatPlanReview(event.review))}`;
       break;
     case 'runStats':
       // Run cost lives in the trace header summary, not as another

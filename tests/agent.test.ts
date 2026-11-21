@@ -104,6 +104,7 @@ describe('agent loop with the mock model', () => {
       'toolResult',
       'planStepDone',
       'modelReply',
+      'planReview',
       'runStats',
       'final',
     ]);

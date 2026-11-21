@@ -10,13 +10,14 @@
 
 import { compressHistory } from './memory';
 import { disabledToolResult, isToolDisabled, normalizeDisabledTools } from './permissions';
+import { summarizePlanReview } from './planReview';
 import { completeStep, createPlan, formatPlan, nextPending, type PlanItem } from './planner';
 import { resolveMaxToolRetries } from './retry';
 import { computeRunStats } from './stats';
 import { ToolRegistry } from './tools';
 import { measureToolDuration } from './toolTiming';
 import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
-import type { ChatModel, Message, RunStats, TraceEvent } from './types';
+import type { ChatModel, Message, PlanReview, RunStats, TraceEvent } from './types';
 
 export interface AgentOptions {
   maxSteps?: number;
@@ -58,6 +59,10 @@ export interface RunResult {
   /** Run-cost statistics (Day 10): steps, tool calls and duration,
    *  also emitted as a `runStats` trace event before final/stopped. */
   stats: RunStats;
+  /** Plan review (Day 21): completion tally of this run's plan,
+   *  emitted as a `planReview` trace event before final/stopped.
+   *  Present only when the model produced a plan for this run. */
+  planReview?: PlanReview;
 }
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -165,10 +170,12 @@ export class Agent {
 
       if (reply.type === 'text') {
         this.messages.push({ role: 'assistant', content: reply.content });
+        const planReview = plan ? summarizePlanReview(plan) : undefined;
+        if (planReview) emit({ type: 'planReview', review: planReview });
         const stats = buildStats();
         emit({ type: 'runStats', stats });
         emit({ type: 'final', content: reply.content });
-        return { finalText: reply.content, trace, steps: step, plan, stats };
+        return { finalText: reply.content, trace, steps: step, plan, stats, planReview };
       }
 
       // Tool call(s): one turn may carry several calls. Record them as a
@@ -234,9 +241,11 @@ export class Agent {
     }
 
     const reason = `达到最大步数 ${this.maxSteps}，已停止。`;
+    const planReview = plan ? summarizePlanReview(plan) : undefined;
+    if (planReview) emit({ type: 'planReview', review: planReview });
     const stats = buildStats();
     emit({ type: 'runStats', stats });
     emit({ type: 'stopped', reason });
-    return { finalText: reason, trace, steps: this.maxSteps, plan, stats };
+    return { finalText: reason, trace, steps: this.maxSteps, plan, stats, planReview };
   }
 }

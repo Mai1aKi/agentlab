@@ -24,6 +24,7 @@ const EVENT_TYPES = new Set([
   'planStepDone',
   'subAgentStarted',
   'subAgentDone',
+  'planReview',
   'runStats',
   'final',
   'stopped',

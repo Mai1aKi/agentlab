@@ -4,6 +4,7 @@
 // console keeps the chat log and the last trace, this module only
 // formats them, so the exact file content is testable without a DOM.
 
+import { formatPlanReview } from './planReview';
 import { formatRunStats } from './stats';
 import { formatToolDuration } from './toolTiming';
 import type { TraceEvent } from './types';
@@ -59,6 +60,8 @@ function renderTraceEvent(event: TraceEvent, index: number): string {
       return `${n}. **子 Agent**：${event.role} 开始：${event.instruction}`;
     case 'subAgentDone':
       return `${n}. **子 Agent**：${event.role} 完成：${event.summary}`;
+    case 'planReview':
+      return `${n}. **计划回看**：${formatPlanReview(event.review)}`;
     case 'runStats':
       return `${n}. **运行成本**：${formatRunStats(event.stats)}`;
     case 'final':

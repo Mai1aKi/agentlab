@@ -55,6 +55,18 @@ export interface ChatModel {
   ): Promise<ModelReply>;
 }
 
+/** Plan completion tally (Day 21): how many of a run's planned
+ *  steps finished, the rounded percentage, and the titles still
+ *  pending (in plan order) when the run ended. */
+export interface PlanReview {
+  total: number;
+  done: number;
+  pending: number;
+  percent: number;
+  complete: boolean;
+  pendingTitles: string[];
+}
+
 /** Cost of one run (Day 10): model steps taken, tool calls made (and
  *  how many failed), and wall-clock duration in milliseconds. */
 export interface RunStats {
@@ -84,6 +96,7 @@ export type TraceEvent =
   | { type: 'planStepDone'; index: number; title: string }
   | { type: 'subAgentStarted'; role: 'researcher' | 'writer'; instruction: string }
   | { type: 'subAgentDone'; role: 'researcher' | 'writer'; summary: string }
+  | { type: 'planReview'; review: PlanReview }
   | { type: 'runStats'; stats: RunStats }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

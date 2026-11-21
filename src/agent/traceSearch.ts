@@ -62,6 +62,12 @@ export function traceEventSearchText(event: TraceEvent): string {
       return `${event.type} ${event.role} ${event.instruction}`;
     case 'subAgentDone':
       return `${event.type} ${event.role} ${event.summary}`;
+    case 'planReview':
+      return (
+        `${event.type} total ${event.review.total} done ${event.review.done} ` +
+        `pending ${event.review.pending} percent ${event.review.percent} ` +
+        `${event.review.pendingTitles.join(' ')}`
+      );
     case 'runStats':
       return (
         `${event.type} steps ${event.stats.steps} toolCalls ${event.stats.toolCalls} ` +

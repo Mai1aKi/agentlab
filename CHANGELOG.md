@@ -1,5 +1,14 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 21 — 2026-11-20
+
+计划回看：运行结束后汇总计划清单的完成度。
+
+- 回看模块（`src/agent/planReview.ts`）：纯函数——`summarizePlanReview` 把计划清单汇总为完成度（总数 / 已完成 / 未完成 / 四舍五入百分比 / 是否全部完成 / 按原序的未完成步标题），无计划或空计划回落零汇总、绝不 NaN 且不改原计划；`formatPlanReview` 渲染一行回看（无计划明说没有计划、全部完成标注 100%、未完成时列出剩余步标题）
+- 类型与运行时（`src/agent/types.ts` + `src/agent/agent.ts`）：新增 `PlanReview` 类型与 `planReview` 轨迹事件；运行时在运行结束（final 与熔断 stopped 两条出口）前、且仅当本轮有计划时，先汇总并发出 `planReview` 事件，`RunResult.planReview` 同步返回同一份数字；无计划的运行不发此事件、行为不变
+- 控制台与导出（`src/main.ts` + `src/agent/conversationExport.ts` + `src/agent/traceSearch.ts` + `src/agent/trace.ts`）：轨迹面板新增「计划回看」一行展示完成度；对话导出同步渲染回看行；轨迹搜索的可搜文本带上总数 / 完成 / 未完成 / 百分比与未完成标题；轨迹导出 / 回放白名单放行新事件，会话恢复随之兼容
+- 单元测试新增 6 个（共 167 个）：无计划零汇总与文案、全部完成 100%、部分完成计数与百分比取整与未完成标题顺序且不改原计划、全部完成与部分完成的一行格式化、存根模型下只做一半的计划运行在 runStats 与 final 之前发出部分回看且与返回值一致；既有计划轨迹顺序断言同步加入 `planReview`
+
 ## Day 20 — 2026-11-19
 
 工具调用计时：每个工具结果标注本次调用耗时。
