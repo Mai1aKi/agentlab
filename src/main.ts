@@ -393,6 +393,11 @@ function addTrace(event: TraceEvent): void {
     case 'planReview':
       div.innerHTML = `<span class="t-tag final">计划回看</span> ${escapeHtml(formatPlanReview(event.review))}`;
       break;
+    case 'textDelta':
+      div.innerHTML =
+        `<span class="t-tag model">流式片段</span> 第 ${event.step} 步 · 第 ${event.index + 1} 片` +
+        `<pre>${escapeHtml(event.delta)}</pre>`;
+      break;
     case 'runStats':
       // Run cost lives in the trace header summary, not as another
       // card competing with the steps (UI polish v5).

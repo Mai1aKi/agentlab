@@ -62,6 +62,8 @@ function renderTraceEvent(event: TraceEvent, index: number): string {
       return `${n}. **子 Agent**：${event.role} 完成：${event.summary}`;
     case 'planReview':
       return `${n}. **计划回看**：${formatPlanReview(event.review)}`;
+    case 'textDelta':
+      return `${n}. **流式片段**：第 ${event.step} 步 · 第 ${event.index + 1} 片\n\n\`\`\`\n${event.delta}\n\`\`\``;
     case 'runStats':
       return `${n}. **运行成本**：${formatRunStats(event.stats)}`;
     case 'final':

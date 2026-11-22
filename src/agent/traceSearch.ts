@@ -68,6 +68,8 @@ export function traceEventSearchText(event: TraceEvent): string {
         `pending ${event.review.pending} percent ${event.review.percent} ` +
         `${event.review.pendingTitles.join(' ')}`
       );
+    case 'textDelta':
+      return `${event.type} ${event.step} ${event.index} ${event.delta}`;
     case 'runStats':
       return (
         `${event.type} steps ${event.stats.steps} toolCalls ${event.stats.toolCalls} ` +

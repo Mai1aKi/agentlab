@@ -1,5 +1,15 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 22 — 2026-11-21
+
+流式轨迹：流式文本片段也记入轨迹面板，可回看生成过程。
+
+- 流式轨迹模块（`src/agent/streamTrace.ts`）：纯函数——`normalizeStreamDelta` 只放行真实字符串（原样保留，空白也是内容）；`appendStreamDelta` 不可变地追加片段、空片段与非字符串跳过；`joinStreamDeltas` 把片段拼回全文；`collectStreamText` 从一条轨迹按序重建流式文本（无片段回落空串）；`formatStreamTraceSummary` 渲染一行片段数与总字数（无片段明说没有）
+- 类型与运行时（`src/agent/types.ts` + `src/agent/agent.ts`）：新增 `textDelta` 轨迹事件（步号 / 全程到达序号 / 片段原文）；运行时仅在调用方提供了流式回调时才包装回调——每个非空片段先记为 `textDelta` 事件再原样转发，空片段只转发不入轨迹；没有流式回调时模型调用方式完全不变、不请求流式、不发此事件
+- 控制台与导出（`src/main.ts` + `src/agent/conversationExport.ts` + `src/agent/traceSearch.ts` + `src/agent/traceFilter.ts` + `src/agent/trace.ts`）：轨迹面板新增「流式片段」一行展示步号、片序与片段原文；对话导出同步渲染片段；轨迹搜索的可搜文本带上步号 / 片序 / 片段原文；轨迹筛选把流式片段归入模型类；轨迹导出 / 回放白名单放行新事件，会话恢复随之兼容
+- ROADMAP 清单只剩 2 件未完成，按规则补 5 件新的小条目（Day 24–28：回放控制 / 知识库命中高亮 / 子 Agent 分组回看 / 评测报告导出 / 双运行对比）
+- 单元测试新增 7 个（共 174 个）：片段消毒、不可变追加与空片段跳过、片段拼回全文、从轨迹按序重建流式文本、一行摘要与空摘要、存根模型下片段逐个入轨迹且仍原样转发（含导出往返）、无流式回调时不请求流式且不发事件
+
 ## Day 21 — 2026-11-20
 
 计划回看：运行结束后汇总计划清单的完成度。

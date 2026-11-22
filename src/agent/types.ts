@@ -97,6 +97,13 @@ export type TraceEvent =
   | { type: 'subAgentStarted'; role: 'researcher' | 'writer'; instruction: string }
   | { type: 'subAgentDone'; role: 'researcher' | 'writer'; summary: string }
   | { type: 'planReview'; review: PlanReview }
+  | {
+      type: 'textDelta';
+      step: number;
+      /** Arrival order of this fragment within the run (Day 22). */
+      index: number;
+      delta: string;
+    }
   | { type: 'runStats'; stats: RunStats }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

@@ -148,12 +148,29 @@ export class Agent {
     // pending plan step, in order.
     let plan: PlanItem[] | undefined;
 
+    // Day 22 · Stream trace: when streaming was requested, every
+    // non-empty fragment the model reports is also recorded as a
+    // textDelta trace event (in arrival order) before it is forwarded
+    // to the caller's callback, so the generation process itself can
+    // be reviewed afterwards. Without a callback the model is called
+    // exactly as before — no streaming is requested, no events fire.
+    let streamIndex = 0;
+
     for (let step = 1; step <= this.maxSteps; step++) {
       this.maybeCompress(emit);
+      const onTextDelta = this.onTextDelta
+        ? (delta: string) => {
+            if (delta) {
+              emit({ type: 'textDelta', step, index: streamIndex, delta });
+              streamIndex += 1;
+            }
+            this.onTextDelta?.(delta);
+          }
+        : undefined;
       const reply = await this.model.complete(
         this.messages,
         this.registry.listSpecs(),
-        this.onTextDelta,
+        onTextDelta,
       );
       emit({ type: 'modelReply', step, reply });
 

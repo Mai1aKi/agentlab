@@ -40,6 +40,7 @@ export function traceEventCategory(
     case 'toolDisabled':
       return 'tool';
     case 'modelReply':
+    case 'textDelta':
       return 'model';
     default:
       return 'other';
