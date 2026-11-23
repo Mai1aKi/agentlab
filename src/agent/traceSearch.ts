@@ -75,6 +75,12 @@ export function traceEventSearchText(event: TraceEvent): string {
         `${event.type} steps ${event.stats.steps} toolCalls ${event.stats.toolCalls} ` +
         `toolErrors ${event.stats.toolErrors} durationMs ${event.stats.durationMs}`
       );
+    case 'budgetAlert':
+      return (
+        `${event.type} steps ${event.check.steps} maxSteps ${event.check.maxSteps} ` +
+        `durationMs ${event.check.durationMs} maxDurationMs ${event.check.maxDurationMs} ` +
+        `exceeded ${event.check.exceeded}`
+      );
     case 'final':
       return `${event.type} ${event.content}`;
     case 'stopped':

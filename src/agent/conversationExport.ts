@@ -4,6 +4,7 @@
 // console keeps the chat log and the last trace, this module only
 // formats them, so the exact file content is testable without a DOM.
 
+import { formatBudgetAlert } from './budget';
 import { formatPlanReview } from './planReview';
 import { formatRunStats } from './stats';
 import { formatToolDuration } from './toolTiming';
@@ -66,6 +67,8 @@ function renderTraceEvent(event: TraceEvent, index: number): string {
       return `${n}. **流式片段**：第 ${event.step} 步 · 第 ${event.index + 1} 片\n\n\`\`\`\n${event.delta}\n\`\`\``;
     case 'runStats':
       return `${n}. **运行成本**：${formatRunStats(event.stats)}`;
+    case 'budgetAlert':
+      return `${n}. **预算提醒**：${formatBudgetAlert(event.check)}`;
     case 'final':
       return `${n}. **完成**：已生成最终回答`;
     case 'stopped':

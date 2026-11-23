@@ -76,6 +76,25 @@ export interface RunStats {
   durationMs: number;
 }
 
+/** Per-run budget (Day 23): the step and duration limits a single
+ *  run is expected to stay within. */
+export interface RunBudget {
+  maxSteps: number;
+  maxDurationMs: number;
+}
+
+/** Budget check (Day 23): a run's actual steps / duration against
+ *  its budget, and which limits (if any) it strictly exceeded. */
+export interface BudgetCheck {
+  maxSteps: number;
+  maxDurationMs: number;
+  steps: number;
+  durationMs: number;
+  overSteps: boolean;
+  overDuration: boolean;
+  exceeded: boolean;
+}
+
 /** One entry in the run trace — the same events the UI visualizes. */
 export type TraceEvent =
   | { type: 'user'; content: string }
@@ -105,5 +124,6 @@ export type TraceEvent =
       delta: string;
     }
   | { type: 'runStats'; stats: RunStats }
+  | { type: 'budgetAlert'; check: BudgetCheck }
   | { type: 'final'; content: string }
   | { type: 'stopped'; reason: string };

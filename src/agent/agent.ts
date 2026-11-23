@@ -8,6 +8,7 @@
 // Every step is recorded as a TraceEvent — that trace is the product:
 // it is what the UI visualizes and what tests assert against.
 
+import { evaluateBudget, sanitizeBudget } from './budget';
 import { compressHistory } from './memory';
 import { disabledToolResult, isToolDisabled, normalizeDisabledTools } from './permissions';
 import { summarizePlanReview } from './planReview';
@@ -17,7 +18,15 @@ import { computeRunStats } from './stats';
 import { ToolRegistry } from './tools';
 import { measureToolDuration } from './toolTiming';
 import { DEFAULT_MAX_TOOL_RESULT_CHARS, truncateToolResult } from './truncate';
-import type { ChatModel, Message, PlanReview, RunStats, TraceEvent } from './types';
+import type {
+  BudgetCheck,
+  ChatModel,
+  Message,
+  PlanReview,
+  RunBudget,
+  RunStats,
+  TraceEvent,
+} from './types';
 
 export interface AgentOptions {
   maxSteps?: number;
@@ -47,6 +56,11 @@ export interface AgentOptions {
   /** Clock for run-cost timing (Day 10); injectable so tests can pin
    *  the measured duration. Defaults to `performance.now`. */
   now?: () => number;
+  /** Budget alert (Day 23): per-run step / duration budget. When the
+   *  run exceeds either limit, a `budgetAlert` trace event marks it
+   *  before the run ends. Partial budgets are completed with the
+   *  defaults from budget.ts. */
+  budget?: Partial<RunBudget>;
 }
 
 export interface RunResult {
@@ -63,6 +77,10 @@ export interface RunResult {
    *  emitted as a `planReview` trace event before final/stopped.
    *  Present only when the model produced a plan for this run. */
   planReview?: PlanReview;
+  /** Budget check (Day 23): this run's steps / duration against its
+   *  budget. Always returned; a `budgetAlert` trace event is emitted
+   *  only when `exceeded` is true. */
+  budgetCheck: BudgetCheck;
 }
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -84,6 +102,7 @@ export class Agent {
   private readonly maxToolRetries: number;
   private readonly disabledTools: ReadonlySet<string>;
   private readonly now: () => number;
+  private readonly budget: RunBudget;
 
   constructor(
     private readonly model: ChatModel,
@@ -100,6 +119,7 @@ export class Agent {
     this.maxToolRetries = resolveMaxToolRetries(options.maxToolRetries);
     this.disabledTools = normalizeDisabledTools(options.disabledTools);
     this.now = options.now ?? (() => performance.now());
+    this.budget = sanitizeBudget(options.budget);
     this.messages.push({ role: 'system', content: this.systemPrompt });
   }
 
@@ -191,8 +211,18 @@ export class Agent {
         if (planReview) emit({ type: 'planReview', review: planReview });
         const stats = buildStats();
         emit({ type: 'runStats', stats });
+        const budgetCheck = evaluateBudget(stats, this.budget);
+        if (budgetCheck.exceeded) emit({ type: 'budgetAlert', check: budgetCheck });
         emit({ type: 'final', content: reply.content });
-        return { finalText: reply.content, trace, steps: step, plan, stats, planReview };
+        return {
+          finalText: reply.content,
+          trace,
+          steps: step,
+          plan,
+          stats,
+          planReview,
+          budgetCheck,
+        };
       }
 
       // Tool call(s): one turn may carry several calls. Record them as a
@@ -262,7 +292,17 @@ export class Agent {
     if (planReview) emit({ type: 'planReview', review: planReview });
     const stats = buildStats();
     emit({ type: 'runStats', stats });
+    const budgetCheck = evaluateBudget(stats, this.budget);
+    if (budgetCheck.exceeded) emit({ type: 'budgetAlert', check: budgetCheck });
     emit({ type: 'stopped', reason });
-    return { finalText: reason, trace, steps: this.maxSteps, plan, stats, planReview };
+    return {
+      finalText: reason,
+      trace,
+      steps: this.maxSteps,
+      plan,
+      stats,
+      planReview,
+      budgetCheck,
+    };
   }
 }

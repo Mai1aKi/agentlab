@@ -27,6 +27,7 @@ const EVENT_TYPES = new Set([
   'planReview',
   'textDelta',
   'runStats',
+  'budgetAlert',
   'final',
   'stopped',
 ]);

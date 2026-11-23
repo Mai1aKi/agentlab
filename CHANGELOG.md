@@ -1,5 +1,14 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 23 — 2026-11-22
+
+成本预算提醒：单次运行步数或耗时超预算时在轨迹里标注。
+
+- 预算模块（`src/agent/budget.ts`）：纯函数——`sanitizeBudget` 把部分 / 坏预算补全为完整预算（默认步数 6、耗时 3000 ms，低于运行时 maxSteps 熔断，是预警不是停止；非正 / 非有限 / 非数字一律回落默认、小数向下取整）；`evaluateBudget` 把运行统计与预算对照，恰好等于上限不算超、严格超过才算超，步数与耗时分别标注；`formatBudgetAlert` 渲染一行提醒（未超预算也明说步数与耗时的实际 / 上限）
+- 类型与运行时（`src/agent/types.ts` + `src/agent/agent.ts`）：新增 `RunBudget` / `BudgetCheck` 类型与 `budgetAlert` 轨迹事件；运行时新增 `budget` 选项，运行结束（final 与熔断 stopped 两条出口）在 `runStats` 之后核算预算——仅超预算时才发 `budgetAlert` 事件，未超预算不发、行为不变；`RunResult.budgetCheck` 每轮都返回同一份核算结果
+- 控制台与导出（`src/main.ts` + `src/agent/conversationExport.ts` + `src/agent/traceSearch.ts` + `src/agent/trace.ts`）：轨迹面板新增「预算提醒」一行展示超出的维度与数值；对话导出同步渲染提醒；轨迹搜索的可搜文本带上实际 / 上限的步数与耗时；轨迹导出 / 回放白名单放行新事件，会话恢复随之兼容
+- 单元测试新增 6 个（共 180 个）：预算补全与坏值回落、恰好达上限不算超、步数 / 耗时分别超限的标注、一行格式化（未超与双超两种）、存根模型下超步数预算时在 runStats 与 final 之间发出提醒且导出往返不丢、未超预算时只返回核算不发事件
+
 ## Day 22 — 2026-11-21
 
 流式轨迹：流式文本片段也记入轨迹面板，可回看生成过程。

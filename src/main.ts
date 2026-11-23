@@ -24,6 +24,7 @@ import {
   formatShortcutHint,
   resolveShortcutAction,
 } from './agent/shortcuts';
+import { formatBudgetAlert } from './agent/budget';
 import { formatPlanReview } from './agent/planReview';
 import { formatRunStats } from './agent/stats';
 import { formatToolDuration } from './agent/toolTiming';
@@ -403,6 +404,9 @@ function addTrace(event: TraceEvent): void {
       // card competing with the steps (UI polish v5).
       traceSummaryEl.textContent = formatRunStats(event.stats);
       return;
+    case 'budgetAlert':
+      div.innerHTML = `<span class="t-tag error">预算提醒</span> ${escapeHtml(formatBudgetAlert(event.check))}`;
+      break;
     case 'final':
       div.innerHTML = `<span class="t-tag final">完成</span> 已生成最终回答`;
       break;
