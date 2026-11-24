@@ -29,7 +29,16 @@ import { formatPlanReview } from './agent/planReview';
 import { formatRunStats } from './agent/stats';
 import { formatToolDuration } from './agent/toolTiming';
 import { BUILTIN_PROMPT_TEMPLATES } from './agent/templates';
-import { parseTrace, replayTrace, serializeTrace } from './agent/trace';
+import { createReplay, parseTrace, serializeTrace } from './agent/trace';
+import {
+  createReplayState,
+  formatReplayStatus,
+  pauseReplay,
+  playReplay,
+  stepReplay,
+  tickReplay,
+  type ReplayState,
+} from './agent/replayControl';
 import {
   matchesTraceFilter,
   normalizeTraceFilter,
@@ -89,6 +98,10 @@ const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivEl
 const traceSearchInputEl = document.getElementById('trace-search-input') as HTMLInputElement | null;
 const traceSearchCountEl = document.getElementById('trace-search-count') as HTMLSpanElement | null;
 const traceEmptyEl = document.getElementById('trace-empty') as HTMLDivElement | null;
+const replayControlsEl = document.getElementById('replay-controls') as HTMLDivElement | null;
+const replayToggleBtn = document.getElementById('replay-toggle-btn') as HTMLButtonElement | null;
+const replayStepBtn = document.getElementById('replay-step-btn') as HTMLButtonElement | null;
+const replayStatusEl = document.getElementById('replay-status') as HTMLSpanElement | null;
 
 /** UI v6 · Progressive disclosure: secondary controls (prompt
  *  templates + tool toggles on the left, export / import / clear
@@ -568,6 +581,61 @@ clearSessionBtn.addEventListener('click', () => {
   }
 });
 
+// Day 24 · Replay control: an imported trace plays back on a
+// timer instead of all at once, so it can be paused, resumed and
+// stepped one event at a time. The pure replayControl state owns
+// position / playing / done; this block owns only the timer.
+let replayState: ReplayState | null = null;
+let replayStepper: ReturnType<typeof createReplay> | null = null;
+let replayTimer: ReturnType<typeof setInterval> | null = null;
+
+function renderReplayControls(): void {
+  if (!replayControlsEl || !replayState) return;
+  replayControlsEl.hidden = false;
+  if (replayStatusEl) replayStatusEl.textContent = formatReplayStatus(replayState);
+  if (replayToggleBtn) {
+    replayToggleBtn.textContent = replayState.playing ? '暂停' : '继续';
+    replayToggleBtn.disabled = replayState.done;
+  }
+  if (replayStepBtn) replayStepBtn.disabled = replayState.done;
+}
+
+function stopReplayTimer(): void {
+  if (replayTimer !== null) {
+    clearInterval(replayTimer);
+    replayTimer = null;
+  }
+}
+
+function startReplayTimer(): void {
+  stopReplayTimer();
+  replayTimer = setInterval(() => {
+    if (!replayState || !replayStepper || !replayState.playing) return;
+    const event = replayStepper.next();
+    if (event !== undefined) addTrace(event);
+    replayState = tickReplay(replayState);
+    if (replayState.done) stopReplayTimer();
+    renderReplayControls();
+  }, 350);
+}
+
+replayToggleBtn?.addEventListener('click', () => {
+  if (!replayState || replayState.done) return;
+  replayState = replayState.playing ? pauseReplay(replayState) : playReplay(replayState);
+  if (replayState.playing) startReplayTimer();
+  else stopReplayTimer();
+  renderReplayControls();
+});
+
+replayStepBtn?.addEventListener('click', () => {
+  if (!replayState || !replayStepper || replayState.done) return;
+  stopReplayTimer();
+  const event = replayStepper.next();
+  if (event !== undefined) addTrace(event);
+  replayState = stepReplay(replayState);
+  renderReplayControls();
+});
+
 importTraceBtn.addEventListener('click', () => importTraceFile.click());
 importTraceFile.addEventListener('change', () => {
   const file = importTraceFile.files?.[0];
@@ -576,11 +644,15 @@ importTraceFile.addEventListener('change', () => {
   void file.text().then((text) => {
     try {
       const events = parseTrace(text);
+      stopReplayTimer();
       traceEl.innerHTML = '';
       lastTrace = [...events];
-      const count = replayTrace(events, addTrace);
+      replayStepper = createReplay(events);
+      replayState = playReplay(createReplayState(events.length));
       persistSession();
-      statusEl.textContent = `已回放导入的轨迹：${count} 个事件`;
+      renderReplayControls();
+      startReplayTimer();
+      statusEl.textContent = `已导入轨迹，开始回放：${events.length} 个事件（可暂停 / 单步）`;
     } catch (e) {
       statusEl.textContent = `导入失败：${e instanceof Error ? e.message : String(e)}`;
     }

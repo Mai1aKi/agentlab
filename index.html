@@ -91,6 +91,12 @@
         <input id="trace-search-input" class="trace-search-input" type="text" placeholder="按关键词过滤轨迹，如 calculator" aria-label="按关键词过滤轨迹事件">
         <span id="trace-search-count" class="trace-search-count"></span>
       </div>
+      <div id="replay-controls" class="toolbar trace-actions" role="group" aria-label="回放控制" hidden>
+        <span class="toolbar-label">回放控制</span>
+        <button id="replay-toggle-btn" type="button" class="chip chip-sm">暂停</button>
+        <button id="replay-step-btn" type="button" class="chip chip-sm">单步前进</button>
+        <span id="replay-status" class="trace-search-count"></span>
+      </div>
       <div id="cost-comparison" class="cost-comparison" hidden></div>
       <div id="trace-empty" class="empty-note">运行一个任务后，这里会一步一步显示 Agent 先想什么、再调用哪个工具、最后怎么得出答案。</div>
       <div id="trace" class="trace"></div>
