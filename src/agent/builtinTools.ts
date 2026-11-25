@@ -3,6 +3,7 @@
 
 import { ToolRegistry, type Tool} from './tools';
 import { chunkText, createTfIdfIndex, type RagHit } from './rag';
+import { formatKbHit } from './kbCitation';
 
 // ---------- calculator: a real little expression parser (no eval) ----------
 
@@ -225,9 +226,10 @@ description: 'Search the knowledge base (built-in AI / CS notes plus imported cu
 parameters: { query: 'string'},
 },
 run: (args) => {
-const hits = searchKnowledgeChunks(String(args.query));
+const query = String(args.query);
+const hits = searchKnowledgeChunks(query);
 if (hits.length === 0) return '知识库里没有找到相关条目。';
-return hits.map((h) => `【${h.title}】${h.text}`).join('\n');
+return hits.map((h) => formatKbHit(h, query)).join('\n');
 },
 };
 
