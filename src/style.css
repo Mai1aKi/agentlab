@@ -409,6 +409,11 @@ button.primary:disabled { opacity: 0.5; cursor: wait; }
 .cost-comparison th, .cost-comparison td { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .cost-comparison th:first-child, .cost-comparison td:first-child { text-align: left; white-space: normal; word-break: break-all; }
 .cost-comparison tfoot td { color: var(--ink); border-bottom: none; }
+/* Day 26 · sub-agent groups: per-role collapsed review blocks. */
+.subagent-groups { flex: 0 0 auto; padding: 4px 16px 10px; font-size: 0.78rem; color: var(--ink-dim); }
+.subagent-groups details { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.subagent-groups summary { cursor: pointer; font-family: var(--mono); font-size: 0.74rem; }
+.subagent-group-line { padding: 2px 0 2px 14px; word-break: break-all; }
 .chip-sm { font-size: 0.78rem; padding: 5px 11px; }
 .trace {
   flex: 1 1 auto;

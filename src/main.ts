@@ -25,6 +25,14 @@ import {
   resolveShortcutAction,
 } from './agent/shortcuts';
 import { formatBudgetAlert } from './agent/budget';
+import {
+  formatSubAgentGroup,
+  formatSubAgentGroups,
+  groupSubAgentEvents,
+  isRoleCollapsed,
+  toggleCollapsedRole,
+  type SubAgentTraceEvent,
+} from './agent/subAgentGroups';
 import { formatPlanReview } from './agent/planReview';
 import { formatRunStats } from './agent/stats';
 import { formatToolDuration } from './agent/toolTiming';
@@ -95,6 +103,7 @@ const importTraceFile = document.getElementById('import-trace-file') as HTMLInpu
 const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
 const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanElement;
 const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivElement;
+const subAgentGroupsEl = document.getElementById('subagent-groups') as HTMLDivElement | null;
 const traceSearchInputEl = document.getElementById('trace-search-input') as HTMLInputElement | null;
 const traceSearchCountEl = document.getElementById('trace-search-count') as HTMLSpanElement | null;
 const traceEmptyEl = document.getElementById('trace-empty') as HTMLDivElement | null;
@@ -338,7 +347,60 @@ function addBubble(role: 'user' | 'assistant', text: string): void {
   persistSession();
 }
 
+/** Day 26 · Sub-agent grouped review: sub-agent events of the
+ *  current trace, folded per role into collapsed <details> blocks
+ *  above the trace. A new run (a fresh `user` event) resets the
+ *  groups; the flat trace items below stay exactly as before. */
+let subAgentEvents: SubAgentTraceEvent[] = [];
+let collapsedSubAgentRoles: string[] = [];
+
+function renderSubAgentGroups(): void {
+  if (!subAgentGroupsEl) return;
+  const groups = groupSubAgentEvents(subAgentEvents);
+  if (groups.length === 0) {
+    subAgentGroupsEl.hidden = true;
+    subAgentGroupsEl.innerHTML = '';
+    return;
+  }
+  subAgentGroupsEl.innerHTML =
+    `<div class="cost-comparison-title">${escapeHtml(formatSubAgentGroups(groups))}</div>` +
+    groups
+      .map((group) => {
+        const lines = group.events
+          .map((e) =>
+            e.type === 'subAgentStarted'
+              ? `<div class="subagent-group-line">开始：${escapeHtml(e.instruction)}</div>`
+              : `<div class="subagent-group-line">完成：${escapeHtml(e.summary)}</div>`,
+          )
+          .join('');
+        const open = isRoleCollapsed(collapsedSubAgentRoles, group.role) ? '' : ' open';
+        return `<details data-subagent-role="${escapeHtml(group.role)}"${open}><summary>${escapeHtml(formatSubAgentGroup(group))}</summary>${lines}</details>`;
+      })
+      .join('');
+  subAgentGroupsEl.hidden = false;
+  for (const details of Array.from(subAgentGroupsEl.querySelectorAll<HTMLDetailsElement>('details[data-subagent-role]'))) {
+    details.addEventListener('toggle', () => {
+      const role = details.dataset.subagentRole ?? '';
+      const shouldBeCollapsed = !details.open;
+      if (isRoleCollapsed(collapsedSubAgentRoles, role) !== shouldBeCollapsed) {
+        collapsedSubAgentRoles = toggleCollapsedRole(collapsedSubAgentRoles, role);
+      }
+    });
+  }
+}
+
 function addTrace(event: TraceEvent): void {
+  if (event.type === 'user') {
+    subAgentEvents = [];
+    collapsedSubAgentRoles = [];
+    renderSubAgentGroups();
+  } else if (event.type === 'subAgentStarted' || event.type === 'subAgentDone') {
+    if (!subAgentEvents.some((e) => e.role === event.role)) {
+      collapsedSubAgentRoles = toggleCollapsedRole(collapsedSubAgentRoles, event.role);
+    }
+    subAgentEvents = [...subAgentEvents, event];
+    renderSubAgentGroups();
+  }
   if (traceEmptyEl) traceEmptyEl.hidden = true;
   const div = document.createElement('div');
   div.className = 'trace-item';
@@ -646,6 +708,9 @@ importTraceFile.addEventListener('change', () => {
       const events = parseTrace(text);
       stopReplayTimer();
       traceEl.innerHTML = '';
+      subAgentEvents = [];
+      collapsedSubAgentRoles = [];
+      renderSubAgentGroups();
       lastTrace = [...events];
       replayStepper = createReplay(events);
       replayState = playReplay(createReplayState(events.length));

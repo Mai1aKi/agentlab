@@ -1,5 +1,13 @@
 # CHANGELOG · AgentLab 的生长记录
 
+## Day 26 — 2026-11-25
+
+子 Agent 分组回看：多 Agent 事件按角色分组折叠展示。
+
+- 分组模块（`src/agent/subAgentGroups.ts`）：纯函数——`groupSubAgentEvents` 把一条轨迹里的 `subAgentStarted` / `subAgentDone` 事件按角色折叠成组（组按角色首次出现顺序、组内保持原序、其它事件忽略、不改原轨迹），每组计开始 / 完成条数；`toggleCollapsedRole` / `isRoleCollapsed` 纯函数维护折叠角色集合（空白 / 非字符串角色忽略）；`formatSubAgentGroup` / `formatSubAgentGroups` 渲染一行组摘要与总摘要（无子 Agent 事件时明说暂无）
+- 控制台（`src/main.ts` + `index.html` + `src/style.css`）：轨迹面板上方新增「子 Agent 分组」回看区——每个角色一个原生 `<details>` 折叠块，默认折叠，摘要行写明角色与开始 / 完成条数，展开看该角色的开始指令与完成小结；新运行（新的 `user` 事件）与轨迹导入时分组重置，读者展开 / 折叠的选择在本次回看内保留；原有平铺轨迹条目不变
+- 单元测试新增 6 个（共 200 个）：按角色分组与首次出现顺序与计数、交错同角色事件归一组且保持原序、无子 Agent 事件为空且不改原轨迹、折叠集合纯函数切换与坏角色忽略、单组一行摘要、总摘要与空摘要
+
 ## Day 25 — 2026-11-24
 
 知识库命中高亮：kb_search 结果标注命中的知识片段出处。
