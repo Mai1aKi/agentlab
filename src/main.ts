@@ -6,7 +6,8 @@ import {
   formatConversationMarkdown,
   type ConversationMessage,
 } from './agent/conversationExport';
-import { formatEvalReport, runEvalSuite } from './agent/eval';
+import { formatEvalReport, runEvalSuite, type EvalCaseResult, type EvalSummary } from './agent/eval';
+import { formatEvalReportMarkdown } from './agent/evalExport';
 import { MockModel } from './agent/mockModel';
 import { runMultiAgent } from './agent/multiAgent';
 import { OpenAiCompatibleModel } from './agent/openaiModel';
@@ -97,6 +98,7 @@ const exportTraceBtn = document.getElementById('export-trace-btn') as HTMLButton
 const exportConversationBtn = document.getElementById(
   'export-conversation-btn',
 ) as HTMLButtonElement;
+const exportEvalBtn = document.getElementById('export-eval-btn') as HTMLButtonElement | null;
 const clearSessionBtn = document.getElementById('clear-session-btn') as HTMLButtonElement;
 const importTraceBtn = document.getElementById('import-trace-btn') as HTMLButtonElement;
 const importTraceFile = document.getElementById('import-trace-file') as HTMLInputElement;
@@ -494,6 +496,11 @@ function addTrace(event: TraceEvent): void {
   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 
+/** Day 27 · The most recent eval-bench batch, kept so its report
+ *  can be exported as Markdown after the run. Null until the bench
+ *  has run once in this session. */
+let lastEvalBatch: { results: EvalCaseResult[]; summary: EvalSummary } | null = null;
+
 let running = false;
 async function runTask(text: string): Promise<void> {
   const task = text.trim();
@@ -513,6 +520,7 @@ async function runTask(text: string): Promise<void> {
         const bench = new Agent(new MockModel(), createDefaultRegistry(), { disabledTools });
         return bench.run(prompt);
       });
+      lastEvalBatch = { results: suite.results, summary: suite.summary };
       const report = formatEvalReport(suite.results, suite.summary);
       lastTrace.push({ type: 'final', content: report });
       addTrace({ type: 'final', content: report });
@@ -632,6 +640,24 @@ exportConversationBtn.addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
   statusEl.textContent = `已导出对话 Markdown：${chatLog.length} 条消息 · ${lastTrace.length} 个轨迹事件`;
+});
+
+exportEvalBtn?.addEventListener('click', () => {
+  if (!lastEvalBatch) {
+    statusEl.textContent = '暂无可导出的评测报告，先运行一次评测台。';
+    return;
+  }
+  const blob = new Blob(
+    [formatEvalReportMarkdown(lastEvalBatch.results, lastEvalBatch.summary)],
+    { type: 'text/markdown' },
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'agentlab-eval-report.md';
+  a.click();
+  URL.revokeObjectURL(url);
+  statusEl.textContent = `已导出评测报告 Markdown：${lastEvalBatch.summary.passed}/${lastEvalBatch.summary.total} 个任务通过`;
 });
 
 clearSessionBtn.addEventListener('click', () => {
