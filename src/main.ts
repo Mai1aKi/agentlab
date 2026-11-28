@@ -34,6 +34,13 @@ import {
   toggleCollapsedRole,
   type SubAgentTraceEvent,
 } from './agent/subAgentGroups';
+import {
+  compareRunSnapshots,
+  findLatestSameTaskPair,
+  formatRunComparison,
+  recordRunSnapshot,
+  type RunSnapshot,
+} from './agent/runComparison';
 import { formatPlanReview } from './agent/planReview';
 import { formatRunStats } from './agent/stats';
 import { formatToolDuration } from './agent/toolTiming';
@@ -105,6 +112,7 @@ const importTraceFile = document.getElementById('import-trace-file') as HTMLInpu
 const modelStatusEl = document.getElementById('model-status') as HTMLSpanElement;
 const traceSummaryEl = document.getElementById('trace-summary') as HTMLSpanElement;
 const costComparisonEl = document.getElementById('cost-comparison') as HTMLDivElement;
+const runComparisonEl = document.getElementById('run-comparison') as HTMLDivElement | null;
 const subAgentGroupsEl = document.getElementById('subagent-groups') as HTMLDivElement | null;
 const traceSearchInputEl = document.getElementById('trace-search-input') as HTMLInputElement | null;
 const traceSearchCountEl = document.getElementById('trace-search-count') as HTMLSpanElement | null;
@@ -159,6 +167,26 @@ function renderCostComparison(): void {
     `<td>${summary.totalSteps}</td><td>${summary.totalToolCalls}</td>` +
     `<td>${summary.totalToolErrors}</td><td>${summary.totalDurationMs} ms</td></tr></tfoot></table>`;
   costComparisonEl.hidden = false;
+}
+
+/** Day 28 · Finished normal-run snapshots (task + final answer +
+ *  cost); when the same task has run twice, the latest pair is
+ *  rendered side by side under the cost table. */
+let runSnapshots: RunSnapshot[] = [];
+
+function renderRunComparison(): void {
+  if (!runComparisonEl) return;
+  const pair = findLatestSameTaskPair(runSnapshots);
+  if (!pair) {
+    runComparisonEl.hidden = true;
+    runComparisonEl.innerHTML = '';
+    return;
+  }
+  const lines = formatRunComparison(compareRunSnapshots(pair[0], pair[1])).split('\n');
+  runComparisonEl.innerHTML =
+    `<div class="cost-comparison-title">${escapeHtml(lines[0])}</div>` +
+    lines.slice(1).map((l) => `<div>${escapeHtml(l)}</div>`).join('');
+  runComparisonEl.hidden = false;
 }
 
 /** The most recent run's trace, for export (Day 5). */
@@ -591,6 +619,8 @@ async function runTask(text: string): Promise<void> {
     });
     runCostHistory = recordRunCost(runCostHistory, task, result.stats);
     renderCostComparison();
+    runSnapshots = recordRunSnapshot(runSnapshots, task, result.finalText, result.stats);
+    renderRunComparison();
     if (stream.el) {
       // The streamed bubble never went through addBubble, so record
       // its final text in the chat log here (Day 12).
